@@ -8,6 +8,7 @@ use App\Models\DocumentType;
 use App\Models\Opd;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @extends Factory<Document>
@@ -46,7 +47,7 @@ class DocumentFactory extends Factory
         return $this->afterCreating(function (Document $document) use ($content) {
             $disk = config('agent-finance.documents.disk');
 
-            \Illuminate\Support\Facades\Storage::disk($disk)
+            Storage::disk($disk)
                 ->put($document->file_path, $content);
         });
     }

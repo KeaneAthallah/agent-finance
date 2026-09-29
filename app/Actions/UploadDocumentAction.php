@@ -24,7 +24,7 @@ final class UploadDocumentAction
 {
     /**
      * @throws DuplicateDocumentException when the SHA-256 hash already exists
-     * @throws RuntimeException           when storage fails
+     * @throws RuntimeException when storage fails
      */
     public function execute(
         UploadedFile $file,

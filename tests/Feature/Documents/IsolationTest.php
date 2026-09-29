@@ -3,14 +3,12 @@
 use App\Enums\UserRole;
 use App\Models\Document;
 use App\Models\Opd;
-use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
 use function Pest\Laravel\actingAs;
-use function Pest\Laravel\delete;
-use function Pest\Laravel\get;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 it('scopes the index to the user opd', function () {
     $opdA = testOpd();

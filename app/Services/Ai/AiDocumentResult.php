@@ -8,7 +8,7 @@ namespace App\Services\Ai;
 final class AiDocumentResult
 {
     /**
-     * @param array<string, mixed> $meta
+     * @param  array<string, mixed>  $meta
      */
     public function __construct(
         public readonly string $documentType,

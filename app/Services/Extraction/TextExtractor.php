@@ -4,6 +4,7 @@ namespace App\Services\Extraction;
 
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Smalot\PdfParser\Parser;
 
 /**
  * Extracts embedded text from supported document formats (spec §9: digital
@@ -14,7 +15,7 @@ use RuntimeException;
 final class TextExtractor
 {
     public function __construct(
-        private readonly \Smalot\PdfParser\Parser $pdfParser,
+        private readonly Parser $pdfParser,
     ) {}
 
     /**
@@ -243,7 +244,7 @@ final class TextExtractor
         $uri = (string) ($meta['uri'] ?? '');
 
         try {
-            $zip = new \ZipArchive();
+            $zip = new \ZipArchive;
 
             if ($zip->open($uri) !== true) {
                 return null;

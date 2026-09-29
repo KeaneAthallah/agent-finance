@@ -1,26 +1,38 @@
 <?php
 
+use App\Services\Ai\AiExtractionRequest;
 use App\Services\Ai\FakeAIProvider;
 
-it('extracts a document number and amount from OCR-like text', function () {
-    $provider = new FakeAIProvider();
+it('extracts a document number from OCR-like text', function () {
+    $provider = new FakeAIProvider;
 
-    $result = $provider->extractStructuredData(new App\Services\Ai\AiExtractionRequest(
+    $result = $provider->extractStructuredData(new AiExtractionRequest(
         pages: [
             ['page' => 1, 'text' => "SURAT PERINTAH MEMBAYAR\nNomor: SPM-001/2026\nJumlah Rp125.000.000"],
         ],
         documentType: 'spm',
+        schema: [
+            'properties' => [
+                'document_number' => ['type' => 'string'],
+                'amount' => ['type' => 'number'],
+            ],
+        ],
     ));
 
-    expect($result->data['document_type'])->toBe('SPM')
-        ->and($result->data['document_number'])->toBe('SPM-001/2026')
+    expect($result->data['document_number'])->toBe('SPM-001/2026')
+        ->and($result->data['amount'])->toBe(125000000.0)
         ->and($result->confidence)->toBeGreaterThan(0.5);
+
+    $field = $result->fields['document_number'];
+
+    expect($field['confidence'])->toBeGreaterThan(0.5)
+        ->and($field['source']['page'])->toBe(1);
 });
 
 it('falls back to low confidence for unrecognizable text', function () {
-    $provider = new FakeAIProvider();
+    $provider = new FakeAIProvider;
 
-    $result = $provider->extractStructuredData(new App\Services\Ai\AiExtractionRequest(
+    $result = $provider->extractStructuredData(new AiExtractionRequest(
         pages: [['page' => 1, 'text' => 'lorem ipsum dolor']],
         documentType: 'other',
     ));
@@ -29,7 +41,7 @@ it('falls back to low confidence for unrecognizable text', function () {
 });
 
 it('generates deterministic embeddings', function () {
-    $provider = new FakeAIProvider();
+    $provider = new FakeAIProvider;
 
     $first = $provider->generateEmbedding('same text', 'fake-model');
     $second = $provider->generateEmbedding('same text', 'fake-model');

@@ -99,6 +99,16 @@ class Document extends Model
     }
 
     /**
+     * Structured extraction passes across all processing versions (§38).
+     *
+     * @return HasMany<DocumentExtraction, $this>
+     */
+    public function extractions(): HasMany
+    {
+        return $this->hasMany(DocumentExtraction::class);
+    }
+
+    /**
      * @return BelongsTo<DocumentType, $this>
      */
     public function documentType(): BelongsTo
@@ -120,7 +130,6 @@ class Document extends Model
      * applied server-side — client parameters are never trusted.
      *
      * @param  Builder<Document>  $query
-     * @param  User  $user
      * @return Builder<Document>
      */
     public function scopeAccessibleBy(Builder $query, User $user): Builder

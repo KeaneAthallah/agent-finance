@@ -2,8 +2,12 @@
 
 use App\Enums\DocumentStatus;
 use App\Enums\UserRole;
+use App\Events\DocumentUploaded;
 use App\Models\Document;
+use App\Models\DocumentType;
 use App\Models\User;
+use Database\Seeders\AgentFinanceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
@@ -12,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\post;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Upload tests assert upload semantics; the processing chain is covered
@@ -51,7 +55,7 @@ it('uploads a pdf into private storage and creates the document', function () {
     expect($document->opd_id)->toBe($user->opd_id)
         ->and($document->status)->toBe(DocumentStatus::Uploaded)
         ->and($document->original_filename)->toBe('spm_2026.pdf')
-        ->and($document->page_count)->toBeNull()
+        ->and($document->page_count)->toBe(1)
         ->and(strlen($document->file_hash))->toBe(64);
 
     Storage::disk($disk)->assertExists($document->file_path);
@@ -62,13 +66,13 @@ it('uploads a pdf into private storage and creates the document', function () {
 
 it('fires the DocumentUploaded event', function () {
     $disk = fakeDocumentsDisk();
-    Event::fake([App\Events\DocumentUploaded::class]);
+    Event::fake([DocumentUploaded::class]);
 
     actingAs(verifier());
 
     post(route('documents.store'), ['file' => pdfUpload()])->assertRedirect();
 
-    Event::assertDispatched(App\Events\DocumentUploaded::class);
+    Event::assertDispatched(DocumentUploaded::class);
 });
 
 it('computes identical sha-256 for identical content', function () {
@@ -149,9 +153,9 @@ it('validates file size limit', function () {
 
 it('associates the document type when provided', function () {
     $disk = fakeDocumentsDisk();
-    $this->seed(\Database\Seeders\AgentFinanceSeeder::class);
+    $this->seed(AgentFinanceSeeder::class);
 
-    $type = \App\Models\DocumentType::query()->where('code', 'spm')->firstOrFail();
+    $type = DocumentType::query()->where('code', 'spm')->firstOrFail();
 
     actingAs(verifier());
 

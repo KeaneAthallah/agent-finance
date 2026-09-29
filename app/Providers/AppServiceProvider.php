@@ -2,19 +2,24 @@
 
 namespace App\Providers;
 
+use App\Events\DocumentUploaded;
+use App\Listeners\QueueDocumentProcessing;
 use App\Services\Ai\AIProviderInterface;
 use App\Services\Ai\AnthropicProvider;
 use App\Services\Ai\FakeAIProvider;
 use App\Services\Ai\GoogleProvider;
 use App\Services\Ai\OpenAIProvider;
-use Carbon\CarbonImmutable;
 use App\Services\Ocr\FakeOcrProvider;
 use App\Services\Ocr\OcrProviderInterface;
+use App\Services\Ocr\TesseractProvider;
 use App\Services\Sihandal\FakeSihandalClient;
 use App\Services\Sihandal\SihandalApiInterface;
+use App\Services\Sihandal\SihandalClient;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -39,9 +44,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Auto-start processing after upload (spec §30). The listener runs on
         // the queue so HTTP responses stay fast.
-        \Illuminate\Support\Facades\Event::listen(
-            \App\Events\DocumentUploaded::class,
-            \App\Listeners\QueueDocumentProcessing::class,
+        Event::listen(
+            DocumentUploaded::class,
+            QueueDocumentProcessing::class,
         );
     }
 
@@ -105,7 +110,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(OcrProviderInterface::class, function (Application $app) {
             return match (config('agent-finance.ocr.driver')) {
                 'fake' => $app->make(FakeOcrProvider::class),
-                'tesseract' => $app->make(\App\Services\Ocr\TesseractProvider::class),
+                'tesseract' => $app->make(TesseractProvider::class),
                 default => $app->make(FakeOcrProvider::class),
             };
         });
@@ -119,7 +124,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(SihandalApiInterface::class, function (Application $app) {
             if (filled(config('agent-finance.sihandal.base_url'))) {
-                return $app->make(\App\Services\Sihandal\SihandalClient::class);
+                return $app->make(SihandalClient::class);
             }
 
             return $app->make(FakeSihandalClient::class);

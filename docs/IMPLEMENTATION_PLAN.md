@@ -94,24 +94,54 @@ Status legend: ✅ done · 🚧 in progress · ⬜ not started
       signature enforcement, OPD isolation (index/view/download/delete),
       viewer restrictions — 20 new tests, 49 total
 
-### Phase 3 — Queue & OCR & Classification ⬜
+### Phase 3 — Queue, Text Extraction & Classification ✅
 
-- Redis queue in Docker; `ProcessDocumentJob` chain
-- `document_pages`, `document_processing_runs` migrations
-- Embedded-text extraction for digital PDFs; `OcrProviderInterface` +
-  `TesseractProvider` (Docker image with tesseract-ocr + ind traineddata)
-- `ClassifyDocumentJob` with mocked-provider tests; pipeline progress UI
-  (real job states, TanStack Query polling introduced here)
+- [x] `document_pages` + `document_processing_runs` migrations and models
+      (per-page text/OCR state; stage-level observability with duration,
+      errors, versions)
+- [x] `smalot/pdfparser` embedded-text extraction (PDF/CSV/DOCX/XLSX)
+      via `TextExtractor`; `PdfPageRenderer` (poppler `pdftoppm`) renders
+      scanned pages to PNG for OCR input
+- [x] Job chain: `StartDocumentProcessingAction` → `ProcessDocumentJob` →
+      `ExtractTextJob` → `ClassifyDocumentJob`, with version guards against
+      stale retries (§31), explicit failure states (§5), and backoff/retry
+- [x] Auto-start after upload via queued `QueueDocumentProcessing` listener
+      (failure-safe — never breaks the upload response); manual
+      `POST /documents/{id}/process` retry endpoint
+- [x] AI classification against the document_types catalog via the
+      `AIProviderInterface` (fake driver in tests, phpunit.xml pinned)
+- [x] Dashboard counters now computed live from `documents` (OPD-scoped)
+- [x] Pipeline progress UI on the detail page (real run states, durations,
+      errors, retry button, per-page source/confidence table)
+- [x] Docker image: poppler-utils, tesseract-ocr + ind/eng traineddata
+- [x] Tests: full sync-pipeline run, page extraction content, corruption
+      failure state, stale-version guard, retry-without-reupload, pipeline
+      UI payload, classification — 8 new tests, 57 total
 
-### Phase 4 — AI Extraction ⬜
+### Phase 4 — AI Extraction ✅
 
-- `AIProviderInterface` + `OpenAIProvider` (+ env-selected mock for dev)
-- `ai_prompts`, `ai_runs`, `ai_usage` migrations; versioned prompt registry
-- `document_extractions`, `document_extraction_fields` (confidence +
-  evidence: page, bbox, source text)
-- `ExtractFinancialDataJob` with per-type schemas (`SPMSchema`, ...);
-  review workspace panes: extraction fields with confidence badges + evidence
-  jump-to-location in document viewer
+- [x] `AIProviderInterface` + `OpenAIProvider` (+ env-selected fake for dev;
+      anthropic/google placeholders fail fast until implemented)
+- [x] `ai_prompts`, `ai_runs`, `ai_usage` migrations; `PromptRegistry`
+      resolves the active prompt version with a built-in fallback (recorded
+      on every run); prompt identity denormalized onto `ai_runs` (§33)
+- [x] `document_extractions` (versioned payload, status, confidence) +
+      `document_extraction_fields` (value + confidence + evidence:
+      page, bbox, source text); history kept per processing version (§38)
+- [x] `ExtractionSchemaRegistry`: typed per-type field schemas (SPM, SP2D,
+      SPP, invoice/kwitansi/faktur, bukti_transfer, DPA/RKA, generic
+      fallback) rendered to JSON schema for the provider
+- [x] `ExtractFinancialDataJob` dispatched after `ClassifyDocumentJob`:
+      stale-version guard, ai_run + ai_usage rows, explicit failure state
+      (`ai_failed`), transactional field persistence
+- [x] Providers return per-field confidence/evidence; `FakeAIProvider` is
+      schema-driven and deterministic (regex-based, page evidence)
+- [x] Detail page: extraction pane with overall/field confidence badges,
+      evidence jump-to-location, run metadata (provider/model/prompt)
+- [x] Tests: sync-pipeline extraction, per-field confidence/evidence,
+      ai_run/ai_usage rows, prompt version recording, schema registry
+      fallback, version history, provider-failure state, stale-version
+      guard, UI payload, token usage — 10 new tests, 67 total
 
 ### Phase 5 — Review, Validation, Audit ⬜
 

@@ -12,7 +12,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -94,7 +93,9 @@ final class ClassifyDocumentJob implements ShouldQueue
                 'duration_ms' => (int) ($run->started_at?->diffInMilliseconds(now()) ?? 0),
             ]);
 
-            // Phase 4 dispatches ExtractFinancialDataJob here (spec §10).
+            // Schema-constrained extraction runs right after classification
+            // (spec §10) — same processing version, same chain.
+            ExtractFinancialDataJob::dispatch($document->id, $this->version);
         } catch (Throwable $exception) {
             $run->update([
                 'status' => 'failed',

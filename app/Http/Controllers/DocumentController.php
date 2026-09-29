@@ -6,10 +6,12 @@ use App\Actions\StartDocumentProcessingAction;
 use App\Actions\UploadDocumentAction;
 use App\Exceptions\DuplicateDocumentException;
 use App\Http\Requests\StoreDocumentRequest;
+use App\Http\Resources\DocumentExtractionResource;
 use App\Http\Resources\DocumentResource;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\User;
+use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -122,6 +124,13 @@ class DocumentController extends Controller
             ->orderByDesc('id')
             ->get(['stage', 'status', 'error', 'duration_ms', 'version', 'created_at']);
 
+        // Latest extraction pass (any status) with its per-field
+        // confidence/evidence rows (spec §12, §13).
+        $extraction = $document->extractions()
+            ->orderByDesc('version')
+            ->with(['fields', 'run:id,provider,model,prompt_name,prompt_version'])
+            ->first();
+
         return Inertia::render('documents/show', [
             'document' => (new DocumentResource($document))->resolve($request),
             'previewUrl' => $this->temporaryPreviewUrl($document),
@@ -129,6 +138,9 @@ class DocumentController extends Controller
             'pages' => $document->pages()
                 ->orderBy('page_number')
                 ->get(['page_number', 'text_source', 'ocr_confidence', 'processing_status', 'error']),
+            'extraction' => $extraction !== null
+                ? (new DocumentExtractionResource($extraction))->resolve($request)
+                : null,
         ]);
     }
 
@@ -184,7 +196,7 @@ class DocumentController extends Controller
 
         // S3-compatible disks offer temporary signed URLs; the local disk
         // streams through the authorized route instead.
-        $temporaryUrl = $disk instanceof \Illuminate\Filesystem\AwsS3V3Adapter
+        $temporaryUrl = $disk instanceof AwsS3V3Adapter
             ? $disk->temporaryUrl($document->file_path, now()->addMinutes(10))
             : null;
 

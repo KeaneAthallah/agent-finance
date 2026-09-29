@@ -8,7 +8,7 @@ namespace App\Services\Ai;
 final class AiEmbeddingResult
 {
     /**
-     * @param array<int, float> $vector
+     * @param  array<int, float>  $vector
      */
     public function __construct(
         public readonly array $vector,

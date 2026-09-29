@@ -8,7 +8,7 @@ namespace App\Services\Ocr;
 final class OcrResult
 {
     /**
-     * @param array<int, array{x: int, y: int, w: int, h: int, text: string}>|null $boxes
+     * @param  array<int, array{x: int, y: int, w: int, h: int, text: string}>|null  $boxes
      */
     public function __construct(
         public readonly string $text,

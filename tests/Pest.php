@@ -5,6 +5,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Storage;
 |--------------------------------------------------------------------------
 */
 
-pest()->extend(Tests\TestCase::class)
+pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
 
@@ -88,15 +89,15 @@ function minimalPdf(string $text = 'Nomor: SPM-001/2026 Jumlah Rp125.000.000'): 
     }
 
     $xrefPosition = strlen($pdf);
-    $pdf .= 'xref\n0 '.(count($objects) + 1)."\n";
+    $pdf .= "xref\n0 ".(count($objects) + 1)."\n";
     $pdf .= "0000000000 65535 f \n";
 
     foreach ($offsets as $offset) {
         $pdf .= str_pad((string) $offset, 10, '0', STR_PAD_LEFT)." 00000 n \n";
     }
 
-    $pdf .= 'trailer\n<< /Size '.(count($objects) + 1)." /Root 1 0 R >>\n";
-    $pdf .= 'startxref\n'.$xrefPosition."\n%%EOF";
+    $pdf .= "trailer\n<< /Size ".(count($objects) + 1)." /Root 1 0 R >>\n";
+    $pdf .= "startxref\n".$xrefPosition."\n%%EOF";
 
     return $pdf;
 }

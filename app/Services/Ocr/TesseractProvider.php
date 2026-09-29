@@ -3,7 +3,6 @@
 namespace App\Services\Ocr;
 
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 /**

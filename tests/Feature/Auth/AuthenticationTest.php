@@ -1,8 +1,9 @@
 <?php
 
 use App\Enums\UserRole;
-use function Pest\Laravel\post;
+
 use function Pest\Laravel\actingAs;
+use function Pest\Laravel\post;
 
 it('redirects guests from the dashboard to login', function () {
     $this->get(route('dashboard'))->assertRedirect(route('login'));

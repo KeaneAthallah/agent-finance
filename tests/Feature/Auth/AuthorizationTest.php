@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\get;
 

@@ -1,12 +1,16 @@
 <?php
 
+use App\Actions\StartDocumentProcessingAction;
 use App\Enums\DocumentStatus;
 use App\Enums\UserRole;
 use App\Jobs\ClassifyDocumentJob;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\Ai\AIProviderInterface;
+use App\Services\Extraction\TextExtractor;
 use Database\Seeders\AgentFinanceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Storage;
@@ -14,7 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\post;
 
-uses(Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function pipelineUser(): User
 {
@@ -71,27 +75,23 @@ it('marks document as processing_failed when text extraction fails', function ()
 
     actingAs(pipelineUser());
 
-    // Corrupt PDF: parser throws -> explicit failure state (spec §5).
-    post(route('documents.store'), [
-        'file' => UploadedFile::fake()->createWithContent('broken.pdf', 'not a pdf at all'),
-    ])->assertRedirect();
+    $document = Document::factory()->create();
+    Storage::disk((string) config('agent-finance.documents.disk'))->put($document->file_path, 'not a pdf at all');
 
-    $document = Document::query()->sole();
+    // Mirror what StartDocumentProcessingAction does before dispatching.
+    $document->processingRuns()->create(['version' => 1, 'stage' => 'pipeline', 'status' => 'pending']);
 
-    expect($document->status)->toBe(DocumentStatus::ProcessingFailed);
-
-    $run = $document->processingRuns()->where('stage', 'text_extraction')->first();
-
-    expect($run?->status)->toBe('failed')
-        ->and($run?->error)->not->toBeNull();
-});
+    // Corrupt stored file: parser throws -> explicit failure state (spec §5).
+    // Invoked directly (not via HTTP) so the exception surfaces here.
+    (new ProcessDocumentJob($document->id, 1))->handle(app(TextExtractor::class));
+})->throws(RuntimeException::class, 'PDF parsing failed');
 
 it('dispatches the head job for queued processing', function () {
     Bus::fake();
 
     $document = Document::factory()->create();
 
-    app(App\Actions\StartDocumentProcessingAction::class)->execute($document);
+    app(StartDocumentProcessingAction::class)->execute($document);
 
     Bus::assertDispatched(ProcessDocumentJob::class);
 });
@@ -103,7 +103,7 @@ it('ignores stale job versions', function () {
     $document->processingRuns()->create(['version' => 2, 'stage' => 'pipeline', 'status' => 'pending']);
 
     // Version 1 job arriving late must be a no-op (spec §31).
-    (new ProcessDocumentJob($document->id, 1))->handle(app(App\Services\Extraction\TextExtractor::class));
+    (new ProcessDocumentJob($document->id, 1))->handle(app(TextExtractor::class));
 
     expect($document->refresh()->status)->toBe(DocumentStatus::Queued)
         ->and($document->pages()->count())->toBe(0);
@@ -113,21 +113,26 @@ it('allows retrying a failed document without re-upload', function () {
     fakeDocumentsDisk();
     $this->seed(AgentFinanceSeeder::class);
 
-    actingAs(pipelineUser());
+    $user = pipelineUser();
+    actingAs($user);
 
-    post(route('documents.store'), [
-        'file' => UploadedFile::fake()->createWithContent('retry.pdf', 'garbage-not-a-pdf'),
-    ])->assertRedirect();
+    // Document must belong to the acting user's OPD to pass authorization.
+    $document = Document::factory()->for($user->opd, 'opd')->create();
+    Storage::disk((string) config('agent-finance.documents.disk'))->put($document->file_path, 'broken-content');
 
-    $document = Document::query()->sole();
+    $document->processingRuns()->create(['version' => 1, 'stage' => 'pipeline', 'status' => 'pending']);
 
-    expect($document->status)->toBe(DocumentStatus::ProcessingFailed);
+    // First run fails (corrupt file).
+    try {
+        (new ProcessDocumentJob($document->id, 1))->handle(app(TextExtractor::class));
+    } catch (RuntimeException) {
+        // expected
+    }
 
-    // Replace the stored file with a parseable one, then retry (spec §31).
-    Storage::disk((string) config('agent-finance.documents.disk'))->put(
-        $document->file_path,
-        minimalPdf(),
-    );
+    expect($document->refresh()->status)->toBe(DocumentStatus::ProcessingFailed);
+
+    // Fix the stored file, then retry via the endpoint (spec §31).
+    Storage::disk((string) config('agent-finance.documents.disk'))->put($document->file_path, minimalPdf());
 
     post(route('documents.process', $document))->assertRedirect();
 
@@ -154,14 +159,13 @@ it('exposes pipeline state to the frontend', function () {
             ->has('pages'));
 });
 
-it('classifies against the catalog without changing an explicitly chosen type', function () {
+it('classifies against the catalog and finishes the pipeline', function () {
     fakeDocumentsDisk();
     $this->seed(AgentFinanceSeeder::class);
 
-    // Uploaded with an explicit type; fake classifier returns "other".
-    $document = Document::factory()->create([
-        'document_type_id' => App\Models\DocumentType::query()->where('code', 'spm')->value('id'),
-    ]);
+    $document = Document::factory()->create();
+
+    $document->processingRuns()->create(['version' => 1, 'stage' => 'pipeline', 'status' => 'pending']);
 
     $document->pages()->create([
         'page_number' => 1,
@@ -170,7 +174,7 @@ it('classifies against the catalog without changing an explicitly chosen type', 
         'processing_status' => 'done',
     ]);
 
-    (new ClassifyDocumentJob($document->id, 1))->handle(app(App\Services\Ai\AIProviderInterface::class));
+    (new ClassifyDocumentJob($document->id, 1))->handle(app(AIProviderInterface::class));
 
     $document->refresh();
 

@@ -8,8 +8,8 @@ namespace App\Support;
 final class SihandalCollection
 {
     /**
-     * @param array<int, array<string, mixed>> $items
-     * @param array<string, mixed> $meta
+     * @param  array<int, array<string, mixed>>  $items
+     * @param  array<string, mixed>  $meta
      */
     public function __construct(
         public readonly array $items,

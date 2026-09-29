@@ -44,22 +44,43 @@ final class OpenAIProvider implements AIProviderInterface
             ? "\n\nThe output MUST validate against this JSON schema:\n".json_encode($request->schema)
             : '';
 
+        $evidenceSpec = <<<'SPEC'
+
+
+Respond with a JSON object with exactly these two keys:
+1. "data": object matching the schema above (use null for fields not present).
+2. "fields": object keyed by field name; each entry is
+   {"value": <same as data>, "confidence": float 0-1, "source": {"page": int|null, "source_text": string|null}}.
+   "source_text" must quote the exact document line the value came from; omit or null it when the field is null.
+SPEC;
+
         $payload = $this->complete([
             ['role' => 'system', 'content' => $this->systemGuard()],
-            ['role' => 'user', 'content' => "Extract structured financial data from this {$request->documentType} document. Respond only with JSON.{$schemaHint}\n\n".$pages],
+            ['role' => 'user', 'content' => "Extract structured financial data from this {$request->documentType} document. Respond only with JSON.{$schemaHint}{$evidenceSpec}\n\n".$pages],
         ], ['response_format' => ['type' => 'json_object']]);
 
         /** @var array<string, mixed> $decoded */
         $decoded = $this->decodeJson($payload['content'] ?? '{}');
 
+        $data = is_array($decoded['data'] ?? null) ? $decoded['data'] : $decoded;
+
+        /** @var array<string, array{value: mixed, confidence: float, source: array<string, mixed>}> $fields */
+        $fields = is_array($decoded['fields'] ?? null) ? $decoded['fields'] : [];
+
+        if ($data === []) {
+            throw new RuntimeException('AI extraction returned no data.');
+        }
+
         return new AiExtractionResult(
-            data: $decoded,
-            fields: [], // per-field confidence/evidence lands in Phase 4
-            confidence: filled($decoded) ? 0.80 : 0.0,
+            data: $data,
+            fields: $fields,
+            confidence: filled($data) ? 0.80 : 0.0,
             meta: [
                 'provider' => 'openai',
                 'model' => $payload['model'] ?? null,
                 'prompt' => $request->promptName !== '' ? "{$request->promptName}@{$request->promptVersion}" : null,
+                'input_tokens' => $payload['input_tokens'] ?? null,
+                'output_tokens' => $payload['output_tokens'] ?? null,
             ],
         );
     }
@@ -114,7 +135,7 @@ final class OpenAIProvider implements AIProviderInterface
     /**
      * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $extra
-     * @return array{content?: string, model?: string}
+     * @return array{content?: string, model?: string, input_tokens?: int, output_tokens?: int}
      */
     private function complete(array $messages, array $extra = []): array
     {
@@ -140,9 +161,14 @@ final class OpenAIProvider implements AIProviderInterface
 
         $model = $body['model'] ?? null;
 
+        /** @var array{prompt_tokens?: int, completion_tokens?: int}|null $usage */
+        $usage = isset($body['usage']) && is_array($body['usage']) ? $body['usage'] : null;
+
         return [
             'content' => $choices[0]['message']['content'] ?? '',
             'model' => is_string($model) ? $model : null,
+            'input_tokens' => $usage['prompt_tokens'] ?? null,
+            'output_tokens' => $usage['completion_tokens'] ?? null,
         ];
     }
 

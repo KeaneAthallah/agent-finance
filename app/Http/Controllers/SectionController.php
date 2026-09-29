@@ -13,7 +13,6 @@ use Inertia\Response;
  */
 class SectionController extends Controller
 {
-
     public function review(Request $request): Response
     {
         return $this->placeholder($request, 'review', 'Review Queue', 'Documents requiring human attention, ordered by risk.');
@@ -59,9 +58,6 @@ class SectionController extends Controller
         return $this->placeholder($request, 'admin/index', 'Administration', 'Users, roles, OPDs, document types, AI prompts.');
     }
 
-    /**
-     * @return Response
-     */
     private function placeholder(Request $request, string $view, string $title, string $description): Response
     {
         // Reserved for later phases; page renders with role-aware layout.

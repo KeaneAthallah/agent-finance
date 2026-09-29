@@ -20,11 +20,11 @@ class FileSignature implements ValidationRule
      * @var array<string, array{bytes: string, offset: int}>
      */
     private const SIGNATURES = [
-        'pdf' => ['bytes' => "%PDF-", 'offset' => 0],
+        'pdf' => ['bytes' => '%PDF-', 'offset' => 0],
         'png' => ['bytes' => "\x89PNG\r\n\x1a\n", 'offset' => 0],
         'jpg' => ['bytes' => "\xFF\xD8\xFF", 'offset' => 0],
         'jpeg' => ['bytes' => "\xFF\xD8\xFF", 'offset' => 0],
-        'webp' => ['bytes' => "WEBP", 'offset' => 8],
+        'webp' => ['bytes' => 'WEBP', 'offset' => 8],
         'tif' => ['bytes' => "II*\x00", 'offset' => 0],
         'tiff' => ['bytes' => "II*\x00", 'offset' => 0],
         'zip' => ['bytes' => "PK\x03\x04", 'offset' => 0], // docx/xlsx containers
