@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { AppShell } from '@/components/layout/app-shell';
 import {
     Badge,
@@ -7,6 +7,7 @@ import {
     CardContent,
     CardHeader,
     CardTitle,
+    Label,
 } from '@/components/ui';
 import type { InertiaPageProps } from '@/types';
 
@@ -71,12 +72,44 @@ type Extraction = {
     } | null;
 };
 
+type Anomaly = {
+    id: number;
+    type: string;
+    severity: string;
+    status: string;
+    title: string;
+    detail: string | null;
+    evidence: Record<string, unknown> | null;
+};
+
+type Validation = {
+    id: number;
+    version: number;
+    engine_version: string;
+    result: string;
+    summary: { anomaly_count?: number; by_type?: Record<string, number> } | null;
+    duration_ms: number | null;
+    created_at: string;
+    anomalies: Anomaly[];
+};
+
+type ReviewRecord = {
+    id: number;
+    decision: string;
+    notes: string | null;
+    reviewer?: { id: number; name: string } | null;
+    created_at: string;
+};
+
 type Props = InertiaPageProps & {
     document: DocumentDetail;
     previewUrl: string;
     pipeline: PipelineRun[];
     pages: PageState[];
     extraction: Extraction | null;
+    validation: Validation | null;
+    reviews: ReviewRecord[];
+    auth: { can: { review: boolean } };
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -87,6 +120,25 @@ const STAGE_LABELS: Record<string, string> = {
     extraction: 'Financial extraction',
     validation: 'Validation',
     matching: 'SIHANDAL matching',
+};
+
+const SEVERITY_VARIANTS: Record<
+    string,
+    'neutral' | 'blue' | 'green' | 'amber' | 'red' | 'purple'
+> = {
+    info: 'neutral',
+    warning: 'amber',
+    high: 'red',
+    critical: 'red',
+};
+
+const DECISION_VARIANTS: Record<
+    string,
+    'neutral' | 'blue' | 'green' | 'amber' | 'red' | 'purple'
+> = {
+    approved: 'green',
+    rejected: 'red',
+    reanalysis_requested: 'amber',
 };
 
 const STAGE_ORDER = [
@@ -144,7 +196,28 @@ export default function DocumentShow({
     pipeline,
     pages,
     extraction,
+    validation,
+    reviews,
+    auth,
 }: Props) {
+    const reviewForm = useForm<{ decision: string; notes: string }>({
+        decision: '',
+        notes: '',
+    });
+
+    function submitReview(decision: string) {
+        reviewForm.clearErrors();
+        reviewForm.setData('decision', decision);
+        router.post(
+            `/documents/${document.id}/review`,
+            { decision, notes: reviewForm.data.notes },
+            {
+                preserveScroll: true,
+                onSuccess: () => reviewForm.reset(),
+            },
+        );
+    }
+
     return (
         <AppShell title="Document detail">
             <Head title={document.original_filename} />
@@ -491,9 +564,213 @@ export default function DocumentShow({
                 <Card>
                     <CardHeader>
                         <CardTitle>Validation</CardTitle>
+                        {validation ? (
+                            <p className="mt-0.5 text-xs text-neutral-500">
+                                {validation.result === 'passed'
+                                    ? 'All checks passed'
+                                    : `${validation.summary?.anomaly_count ?? 0} finding(s)`}{' '}
+                                · engine v{validation.engine_version} · run v
+                                {validation.version}
+                            </p>
+                        ) : null}
                     </CardHeader>
-                    <CardContent className="p-4 text-sm text-neutral-500">
-                        Validation engine results land in Phase 5.
+                    <CardContent className="p-4">
+                        {validation === null ? (
+                            <p className="text-sm text-neutral-500">
+                                {extraction?.status === 'completed'
+                                    ? 'Validation queued…'
+                                    : 'Runs automatically after extraction.'}
+                            </p>
+                        ) : (
+                            <div>
+                                <div className="mb-3 flex items-center gap-2">
+                                    <Badge
+                                        variant={
+                                            validation.result === 'passed'
+                                                ? 'green'
+                                                : 'amber'
+                                        }
+                                    >
+                                        {validation.result}
+                                    </Badge>
+                                    {validation.duration_ms != null ? (
+                                        <span className="text-xs text-neutral-400 tabular-nums">
+                                            {(
+                                                validation.duration_ms / 1000
+                                            ).toFixed(1)}
+                                            s
+                                        </span>
+                                    ) : null}
+                                </div>
+                                {validation.anomalies.length === 0 ? (
+                                    <p className="text-sm text-neutral-500">
+                                        No anomalies detected.
+                                    </p>
+                                ) : (
+                                    <ul className="space-y-2">
+                                        {validation.anomalies.map((anomaly) => (
+                                            <li
+                                                key={anomaly.id}
+                                                className="rounded-md border border-neutral-200 p-2.5"
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="text-sm font-medium text-neutral-900">
+                                                        {anomaly.title}
+                                                    </span>
+                                                    <span className="flex items-center gap-1.5">
+                                                        <Badge
+                                                            variant={
+                                                                SEVERITY_VARIANTS[
+                                                                    anomaly
+                                                                        .severity
+                                                                ] ?? 'neutral'
+                                                            }
+                                                        >
+                                                            {
+                                                                anomaly.severity
+                                                            }
+                                                        </Badge>
+                                                        <Badge
+                                                            variant={
+                                                                anomaly.status ===
+                                                                'open'
+                                                                    ? 'amber'
+                                                                    : 'green'
+                                                            }
+                                                        >
+                                                            {anomaly.status}
+                                                        </Badge>
+                                                    </span>
+                                                </div>
+                                                {anomaly.detail ? (
+                                                    <p className="mt-1 text-xs text-neutral-600">
+                                                        {anomaly.detail}
+                                                    </p>
+                                                ) : null}
+                                                <p className="mt-1 text-[11px] tracking-wide text-neutral-400 uppercase">
+                                                    {
+                                                        anomaly.type.replaceAll(
+                                                            '_',
+                                                            ' ',
+                                                        )
+                                                    }
+                                                </p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Review</CardTitle>
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                            {reviews.length} decision
+                            {reviews.length === 1 ? '' : 's'} recorded
+                        </p>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                        {reviews.length > 0 ? (
+                            <ul className="mb-4 space-y-2">
+                                {reviews.map((review) => (
+                                    <li
+                                        key={review.id}
+                                        className="rounded-md border border-neutral-200 p-2.5 text-sm"
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Badge
+                                                variant={
+                                                    DECISION_VARIANTS[
+                                                        review.decision
+                                                    ] ?? 'neutral'
+                                                }
+                                            >
+                                                {review.decision.replaceAll(
+                                                    '_',
+                                                    ' ',
+                                                )}
+                                            </Badge>
+                                            <span className="text-xs text-neutral-400">
+                                                {new Date(
+                                                    review.created_at,
+                                                ).toLocaleString()}
+                                            </span>
+                                        </div>
+                                        {review.reviewer?.name ? (
+                                            <p className="mt-1 text-xs text-neutral-500">
+                                                by {review.reviewer.name}
+                                            </p>
+                                        ) : null}
+                                        {review.notes ? (
+                                            <p className="mt-1 text-xs text-neutral-700">
+                                                {review.notes}
+                                            </p>
+                                        ) : null}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : null}
+                        {auth.can.review ? (
+                            <div className="space-y-3">
+                                <div>
+                                    <Label htmlFor="review-notes">
+                                        Review notes
+                                    </Label>
+                                    <textarea
+                                        id="review-notes"
+                                        className="min-h-16 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                        placeholder="Why this decision? (optional)"
+                                        value={reviewForm.data.notes}
+                                        onChange={(e) =>
+                                            reviewForm.setData(
+                                                'notes',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        size="sm"
+                                        disabled={reviewForm.processing}
+                                        onClick={() => submitReview('approved')}
+                                    >
+                                        Approve
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="danger"
+                                        disabled={reviewForm.processing}
+                                        onClick={() => submitReview('rejected')}
+                                    >
+                                        Reject
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={reviewForm.processing}
+                                        onClick={() =>
+                                            submitReview(
+                                                'reanalysis_requested',
+                                            )
+                                        }
+                                    >
+                                        Request re-analysis
+                                    </Button>
+                                </div>
+                                {reviewForm.errors.decision ? (
+                                    <p className="text-xs text-red-600">
+                                        {reviewForm.errors.decision}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-neutral-500">
+                                Verifier role required to review.
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             </div>

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\DocumentStatus;
 use Database\Factories\DocumentFactory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,11 +31,14 @@ use Illuminate\Support\Carbon;
  * @property int|null $fiscal_year
  * @property string|null $document_number
  * @property array<string, mixed>|null $metadata
+ * @property Carbon|null $validated_at
  * @property Carbon $created_at
- * @property Carbon $updated_at
- * @property-read Opd $opd
+ * @property Carbon $updated_at * @property-read Opd $opd
  * @property-read DocumentType|null $documentType
  * @property-read User $uploader
+ * @property-read Collection<int, DocumentReview> $reviews
+ * @property-read Collection<int, DocumentValidation> $validations
+ * @property-read Collection<int, DocumentAnomaly> $anomalies
  */
 class Document extends Model
 {
@@ -55,6 +59,7 @@ class Document extends Model
         'fiscal_year',
         'document_number',
         'metadata',
+        'validated_at',
     ];
 
     protected function casts(): array
@@ -65,6 +70,7 @@ class Document extends Model
             'page_count' => 'integer',
             'fiscal_year' => 'integer',
             'metadata' => 'array',
+            'validated_at' => 'datetime',
         ];
     }
 
@@ -106,6 +112,36 @@ class Document extends Model
     public function extractions(): HasMany
     {
         return $this->hasMany(DocumentExtraction::class);
+    }
+
+    /**
+     * Human review decisions on this document (§14).
+     *
+     * @return HasMany<DocumentReview, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(DocumentReview::class);
+    }
+
+    /**
+     * Validation engine runs (§15).
+     *
+     * @return HasMany<DocumentValidation, $this>
+     */
+    public function validations(): HasMany
+    {
+        return $this->hasMany(DocumentValidation::class);
+    }
+
+    /**
+     * Anomaly indicators across all validation passes (§15, §25).
+     *
+     * @return HasMany<DocumentAnomaly, $this>
+     */
+    public function anomalies(): HasMany
+    {
+        return $this->hasMany(DocumentAnomaly::class);
     }
 
     /**

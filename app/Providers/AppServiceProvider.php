@@ -2,24 +2,33 @@
 
 namespace App\Providers;
 
-use App\Events\DocumentUploaded;
-use App\Listeners\QueueDocumentProcessing;
+use App\Models\Document;
+use App\Models\Opd;
+use App\Models\User;
 use App\Services\Ai\AIProviderInterface;
 use App\Services\Ai\AnthropicProvider;
 use App\Services\Ai\FakeAIProvider;
 use App\Services\Ai\GoogleProvider;
 use App\Services\Ai\OpenAIProvider;
+use App\Services\Extraction\ExtractionSchemaRegistry;
 use App\Services\Ocr\FakeOcrProvider;
 use App\Services\Ocr\OcrProviderInterface;
 use App\Services\Ocr\TesseractProvider;
 use App\Services\Sihandal\FakeSihandalClient;
 use App\Services\Sihandal\SihandalApiInterface;
 use App\Services\Sihandal\SihandalClient;
+use App\Services\Validation\Rules\DuplicateScanRule;
+use App\Services\Validation\Rules\FiscalYearMismatchRule;
+use App\Services\Validation\Rules\LowConfidenceRule;
+use App\Services\Validation\Rules\MissingDocumentNumberRule;
+use App\Services\Validation\Rules\TotalMismatchRule;
+use App\Services\Validation\ValidationEngine;
+use App\Services\Validation\ValidationRule;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -33,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
         $this->bindAiProvider();
         $this->bindOcrProvider();
         $this->bindSihandalClient();
+        $this->bindValidationEngine();
     }
 
     /**
@@ -42,12 +52,17 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
-        // Auto-start processing after upload (spec §30). The listener runs on
-        // the queue so HTTP responses stay fast.
-        Event::listen(
-            DocumentUploaded::class,
-            QueueDocumentProcessing::class,
-        );
+        // Stable, short morph aliases so audit_logs.subject_type (and any
+        // future morph map) reads as "document", not a fully-qualified class.
+        Relation::enforceMorphMap([
+            'document' => Document::class,
+            'user' => User::class,
+            'opd' => Opd::class,
+        ]);
+
+        // Auto-start processing after upload (spec §30). QueueDocumentProcessing
+        // is auto-discovered (typed handle(DocumentUploaded) signature) — do
+        // NOT also call Event::listen here, or the pipeline starts twice.
     }
 
     /**
@@ -113,6 +128,32 @@ class AppServiceProvider extends ServiceProvider
                 'tesseract' => $app->make(TesseractProvider::class),
                 default => $app->make(FakeOcrProvider::class),
             };
+        });
+    }
+
+    /**
+     * Deterministic validation engine (spec §15): pure rules, no AI. The rule
+     * list is the extension point — new rules are registered here, never
+     * hardcoded into jobs.
+     */
+    private function bindValidationEngine(): void
+    {
+        $this->app->singleton(ValidationEngine::class, function (Application $app) {
+            /** @var array<int, class-string<ValidationRule>> $rules */
+            $rules = [
+                TotalMismatchRule::class,
+                FiscalYearMismatchRule::class,
+                MissingDocumentNumberRule::class,
+                LowConfidenceRule::class,
+                DuplicateScanRule::class,
+            ];
+
+            return new ValidationEngine(
+                rules: array_map(fn ($rule) => $app->make($rule), $rules),
+                highConfidence: (float) config('agent-finance.validation.review_confidence', 0.85) * 100,
+                lowConfidence: (float) config('agent-finance.validation.low_confidence', 0.60) * 100,
+                registry: $app->make(ExtractionSchemaRegistry::class),
+            );
         });
     }
 

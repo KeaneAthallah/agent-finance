@@ -114,8 +114,13 @@ final class ExtractFinancialDataJob implements ShouldQueue
 
             $this->persistResult($document, $extraction, $run, $result, $schema);
 
-            // Pipeline continues (Phase 5 dispatches ValidateDocumentJob here).
+            $this->backfillDocumentMetadata($document, $extraction);
+
             $document->update(['status' => DocumentStatus::ExtractionComplete]);
+
+            // Pipeline continues: deterministic validation runs right after a
+            // completed extraction (spec §5, §30) — same processing version.
+            ValidateDocumentJob::dispatch($document->id, $this->version);
         } catch (Throwable $exception) {
             $run->update([
                 'status' => 'failed',
@@ -210,6 +215,51 @@ final class ExtractFinancialDataJob implements ShouldQueue
             'confidence' => $overall,
             'ai_run_id' => $run->id,
         ]);
+    }
+
+    /**
+     * Backfill indexed document columns from the extraction (spec §27):
+     * document_number for duplicate scans and SIHANDAL matching, amounts as
+     * plain numbers into metadata for validation. Never overwrites values a
+     * human may have set first — AI never has the last word on state (§18).
+     */
+    private function backfillDocumentMetadata(Document $document, DocumentExtraction $extraction): void
+    {
+        $payload = $extraction->payload ?? [];
+
+        $metadata = $document->metadata ?? [];
+
+        $amountFields = ['amount', 'total_budget'];
+
+        foreach ($amountFields as $field) {
+            if (isset($payload[$field]) && is_numeric($payload[$field])) {
+                $metadata['extracted_'.$field] = (float) $payload[$field];
+            }
+        }
+
+        $updates = [];
+
+        $number = $payload['document_number'] ?? null;
+
+        if (is_string($number) && trim($number) !== '' && $document->document_number === null) {
+            $updates['document_number'] = trim($number);
+        }
+
+        if ($document->fiscal_year === null) {
+            $fiscalYear = $payload['fiscal_year'] ?? null;
+
+            if (is_numeric($fiscalYear)) {
+                $updates['fiscal_year'] = (int) $fiscalYear;
+            }
+        }
+
+        if ($updates !== []) {
+            $document->update($updates);
+        }
+
+        if ($metadata !== ($document->metadata ?? [])) {
+            $document->forceFill(['metadata' => $metadata])->save();
+        }
     }
 
     private function fieldConfidence(

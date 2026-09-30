@@ -31,7 +31,6 @@ const NAV: { section: string; items: NavItem[] }[] = [
                 label: 'Review Queue',
                 href: '/review',
                 roles: ['admin', 'verifier'],
-                phase: '5',
             },
             {
                 label: 'Validation',
@@ -58,7 +57,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
                 phase: '6',
             },
             { label: 'Reports', href: '/reports', phase: '9' },
-            { label: 'Activity', href: '/activity', phase: '5' },
+            { label: 'Activity', href: '/activity' },
         ],
     },
     {

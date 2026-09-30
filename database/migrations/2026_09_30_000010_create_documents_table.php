@@ -33,6 +33,10 @@ return new class extends Migration
             $table->string('document_number')->nullable();
             $table->json('metadata')->nullable();
 
+            // When the validation engine last processed this document (Phase 5);
+            // orders the review queue (oldest first).
+            $table->timestamp('validated_at')->nullable()->index();
+
             $table->timestamps();
 
             $table->index(['opd_id', 'status']);

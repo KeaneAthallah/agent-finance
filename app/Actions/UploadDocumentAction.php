@@ -8,6 +8,9 @@ use App\Exceptions\DuplicateDocumentException;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\User;
+use App\Support\ActorType;
+use App\Support\AuditLogger;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -31,7 +34,10 @@ final class UploadDocumentAction
         User $uploader,
         ?DocumentType $documentType,
         ?int $fiscalYear,
+        ?Request $request = null,
     ): Document {
+        $request ??= request();
+
         $sha256 = hash_file('sha256', $file->getRealPath(), false);
 
         if (! is_string($sha256)) {
@@ -60,7 +66,7 @@ final class UploadDocumentAction
             throw new RuntimeException('Failed to store the uploaded file.');
         }
 
-        return DB::transaction(function () use ($file, $uploader, $documentType, $fiscalYear, $sha256, $stored, $disk): Document {
+        return DB::transaction(function () use ($file, $uploader, $documentType, $fiscalYear, $sha256, $stored, $disk, $request): Document {
             $document = Document::query()->create([
                 'opd_id' => $uploader->opd_id,
                 'document_type_id' => $documentType?->id,
@@ -76,6 +82,20 @@ final class UploadDocumentAction
             ]);
 
             DocumentUploaded::dispatch($document, $uploader);
+
+            AuditLogger::record(
+                action: 'document.uploaded',
+                subject: $document,
+                actor: $uploader,
+                actorType: ActorType::Human,
+                request: $request,
+                properties: [
+                    'filename' => $file->getClientOriginalName(),
+                    'file_hash' => $sha256,
+                    'file_size' => (int) $file->getSize(),
+                    'fiscal_year' => $fiscalYear,
+                ],
+            );
 
             return $document;
         });

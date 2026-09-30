@@ -8,6 +8,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * @mixin Document
+ *
+ * @property Document $resource
  */
 class DocumentResource extends JsonResource
 {
@@ -29,6 +31,7 @@ class DocumentResource extends JsonResource
             'document_type' => $this->whenLoaded('documentType', fn () => $this->documentType?->only(['id', 'code', 'name'])),
             'opd' => $this->whenLoaded('opd', fn () => $this->opd->only(['id', 'code', 'name'])),
             'uploader' => $this->whenLoaded('uploader', fn () => $this->uploader->only(['id', 'name'])),
+            'validated_at' => $this->validated_at?->toIso8601String(),
             'created_at' => $this->created_at->toIso8601String(),
         ];
     }

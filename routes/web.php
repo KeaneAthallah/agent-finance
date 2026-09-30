@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SectionController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,14 +29,15 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
         Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
         Route::post('/documents/{document}/process', [DocumentController::class, 'process'])->name('documents.process');
-        Route::get('/review', [SectionController::class, 'review'])->name('review.index');
+        Route::get('/review', [ReviewController::class, 'index'])->name('review.index');
+        Route::post('/documents/{document}/review', [ReviewController::class, 'store'])->name('documents.review');
         Route::get('/validation', [SectionController::class, 'validation'])->name('validation.index');
         Route::get('/anomalies', [SectionController::class, 'anomalies'])->name('anomalies.index');
         Route::get('/sihandal', [SectionController::class, 'sihandal'])->name('sihandal.index');
     });
 
     Route::get('/ai-assistant', [SectionController::class, 'aiAssistant'])->name('ai.assistant');
-    Route::get('/activity', [SectionController::class, 'activity'])->name('activity.index');
+    Route::get('/activity', [ActivityController::class, 'index'])->name('activity.index');
     Route::get('/reports', [SectionController::class, 'reports'])->name('reports.index');
 
     Route::middleware('role:admin')->group(function (): void {

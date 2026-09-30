@@ -40,6 +40,19 @@ class DocumentFactory extends Factory
     }
 
     /**
+     * Backfill metadata from the payload (Phase 5): amounts as plain numbers
+     * and the fiscal year from extraction — used by validation tests.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public function withMetadata(array $metadata): static
+    {
+        return $this->afterCreating(fn (Document $document) => $document->forceFill([
+            'metadata' => $metadata,
+        ])->save());
+    }
+
+    /**
      * Create the backing file on the documents disk.
      */
     public function withFile(string $content = 'fixture-pdf-content'): static

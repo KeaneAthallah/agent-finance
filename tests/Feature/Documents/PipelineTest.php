@@ -30,7 +30,7 @@ function pipelinePdf(string $text = 'Nomor: SPM-001/2026 Jumlah Rp125.000.000'):
     return UploadedFile::fake()->createWithContent('bku_2026.pdf', minimalPdf($text));
 }
 
-it('auto-starts processing after upload and runs the pipeline to extraction_complete', function () {
+it('auto-starts processing after upload and runs the pipeline through validation', function () {
     fakeDocumentsDisk();
     $this->seed(AgentFinanceSeeder::class);
 
@@ -40,16 +40,22 @@ it('auto-starts processing after upload and runs the pipeline to extraction_comp
 
     $document = Document::query()->sole();
 
-    // QUEUE_CONNECTION=sync: the whole chain ran inline.
-    expect($document->refresh()->status)->toBe(DocumentStatus::ExtractionComplete)
+    // QUEUE_CONNECTION=sync: the whole chain ran inline. Phase 5 extends the
+    // pipeline past extraction: validation routes to approved (clean) or
+    // review_required (flagged) — never back to extraction_complete.
+    $status = $document->refresh()->status;
+
+    expect($status)->toBeIn([DocumentStatus::Approved, DocumentStatus::ReviewRequired])
         ->and($document->page_count)->toBe(1)
-        ->and($document->pages()->where('processing_status', 'done')->count())->toBe(1);
+        ->and($document->pages()->where('processing_status', 'done')->count())->toBe(1)
+        ->and($document->validations()->count())->toBe(1);
 
     $stages = $document->processingRuns()->pluck('status', 'stage');
 
     expect($stages->get('text_extraction'))->toBe('completed')
         ->and($stages->get('ocr'))->toBe('completed')
-        ->and($stages->get('classification'))->toBe('completed');
+        ->and($stages->get('classification'))->toBe('completed')
+        ->and($stages->get('validation'))->toBe('completed');
 });
 
 it('records the extracted text on the page row', function () {
@@ -136,8 +142,11 @@ it('allows retrying a failed document without re-upload', function () {
 
     post(route('documents.process', $document))->assertRedirect();
 
-    expect($document->refresh()->status)->toBe(DocumentStatus::ExtractionComplete)
-        ->and((int) $document->processingRuns()->max('version'))->toBe(2);
+    // Retry runs the extended pipeline: validation routes past extraction.
+    $document->refresh();
+
+    expect((int) $document->processingRuns()->max('version'))->toBe(2)
+        ->and($document->status)->toBeIn([DocumentStatus::Approved, DocumentStatus::ReviewRequired]);
 });
 
 it('exposes pipeline state to the frontend', function () {
@@ -176,7 +185,9 @@ it('classifies against the catalog and finishes the pipeline', function () {
 
     (new ClassifyDocumentJob($document->id, 1))->handle(app(AIProviderInterface::class));
 
+    // Classification dispatches extraction, which dispatches validation; the
+    // full sync chain ends in a review-routed state, not extraction_complete.
     $document->refresh();
 
-    expect($document->status)->toBe(DocumentStatus::ExtractionComplete);
+    expect($document->status)->toBeIn([DocumentStatus::Approved, DocumentStatus::ReviewRequired]);
 });

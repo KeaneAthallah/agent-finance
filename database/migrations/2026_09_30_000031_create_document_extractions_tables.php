@@ -50,7 +50,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['document_extraction_id', 'field']);
-            $table->index(['document_extraction_id', 'confidence']);
+            $table->index(['document_extraction_id', 'confidence'], 'document_extraction_fields_confidence_idx');
         });
     }
 

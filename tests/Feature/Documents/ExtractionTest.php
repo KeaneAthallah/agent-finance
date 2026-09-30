@@ -62,8 +62,9 @@ it('runs extraction after classification in the sync pipeline', function () {
 
     $document = Document::query()->sole();
 
-    // QUEUE_CONNECTION=sync: classification dispatched extraction inline.
-    expect($document->refresh()->status)->toBe(DocumentStatus::ExtractionComplete);
+    // QUEUE_CONNECTION=sync: classification dispatched extraction, which
+    // dispatched validation inline (Phase 5 pipeline extension).
+    expect($document->refresh()->status)->toBeIn([DocumentStatus::Approved, DocumentStatus::ReviewRequired]);
 
     $extraction = $document->extractions()->first();
 

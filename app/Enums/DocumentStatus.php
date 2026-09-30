@@ -19,6 +19,8 @@ enum DocumentStatus: string
     case Synced = 'synced';
     case Completed = 'completed';
 
+    case Rejected = 'rejected';
+
     case ProcessingFailed = 'processing_failed';
     case OcrFailed = 'ocr_failed';
     case AiFailed = 'ai_failed';
@@ -38,6 +40,19 @@ enum DocumentStatus: string
             self::Ocr,
             self::AiAnalysis,
             self::Validation,
+        ];
+    }
+
+    /**
+     * Terminal states of the human/automation review decision (spec §14).
+     *
+     * @return array<DocumentStatus>
+     */
+    public static function terminal(): array
+    {
+        return [
+            self::Approved,
+            self::Rejected,
         ];
     }
 

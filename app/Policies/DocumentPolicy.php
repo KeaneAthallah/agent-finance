@@ -52,4 +52,21 @@ class DocumentPolicy
             && $user->opd_id !== null
             && $user->opd_id === $document->opd_id;
     }
+
+    /**
+     * Review actions (approve/reject/request re-analysis): verifiers and
+     * admins within their OPD; super admins across OPDs (spec §14, §36).
+     * Viewers can never review. Called with a class name for a general
+     * ability check and with a document for the per-record check.
+     */
+    public function review(User $user, ?Document $document = null): bool
+    {
+        if ($document !== null && ! $this->view($user, $document)) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $user->isAdmin()
+            || $user->hasRole(UserRole::Verifier);
+    }
 }

@@ -9,8 +9,11 @@ use App\Http\Requests\StoreDocumentRequest;
 use App\Http\Resources\DocumentExtractionResource;
 use App\Http\Resources\DocumentResource;
 use App\Models\Document;
+use App\Models\DocumentAnomaly;
 use App\Models\DocumentType;
 use App\Models\User;
+use App\Support\ActorType;
+use App\Support\AuditLogger;
 use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -84,6 +87,7 @@ class DocumentController extends Controller
                     ? DocumentType::query()->findOrFail((int) $validated['document_type_id'])
                     : null,
                 fiscalYear: isset($validated['fiscal_year']) ? (int) $validated['fiscal_year'] : null,
+                request: $request,
             );
         } catch (DuplicateDocumentException $exception) {
             $payload = [
@@ -118,6 +122,10 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
+        $user = $request->user();
+
+        \assert($user instanceof User);
+
         $document->load(['documentType', 'opd', 'uploader']);
 
         $runs = $document->processingRuns()
@@ -131,6 +139,21 @@ class DocumentController extends Controller
             ->with(['fields', 'run:id,provider,model,prompt_name,prompt_version'])
             ->first();
 
+        // Latest validation pass with its anomalies (spec §15) + decision
+        // history (spec §14) — the review context on one page.
+        $validation = $document->validations()
+            ->orderByDesc('version')
+            ->first();
+
+        $anomalies = $validation !== null
+            ? $validation->anomalies()->orderBy('id')->get()
+            : null;
+
+        $reviews = $document->reviews()
+            ->orderByDesc('id')
+            ->with('reviewer:id,name')
+            ->get(['id', 'decision', 'notes', 'reviewer_id', 'created_at']);
+
         return Inertia::render('documents/show', [
             'document' => (new DocumentResource($document))->resolve($request),
             'previewUrl' => $this->temporaryPreviewUrl($document),
@@ -141,6 +164,38 @@ class DocumentController extends Controller
             'extraction' => $extraction !== null
                 ? (new DocumentExtractionResource($extraction))->resolve($request)
                 : null,
+            'validation' => $validation !== null ? [
+                'id' => $validation->id,
+                'version' => $validation->version,
+                'engine_version' => $validation->engine_version,
+                'result' => $validation->result,
+                'summary' => $validation->summary,
+                'duration_ms' => $validation->duration_ms,
+                'created_at' => $validation->created_at->toIso8601String(),
+                'anomalies' => $anomalies !== null ? $anomalies->map(fn (DocumentAnomaly $anomaly) => [
+                    'id' => $anomaly->id,
+                    'type' => $anomaly->type->value,
+                    'severity' => $anomaly->severity->value,
+                    'status' => $anomaly->status->value,
+                    'title' => $anomaly->title,
+                    'detail' => $anomaly->detail,
+                    'evidence' => $anomaly->evidence,
+                ])->all() : [],
+            ] : null,
+            'reviews' => $reviews->map(fn ($review) => [
+                'id' => $review->id,
+                'decision' => $review->decision->value,
+                'notes' => $review->notes,
+                'reviewer' => $review->reviewer !== null
+                    ? ['id' => $review->reviewer->id, 'name' => $review->reviewer->name]
+                    : null,
+                'created_at' => $review->created_at->toIso8601String(),
+            ])->all(),
+            'auth' => [
+                'can' => [
+                    'review' => $user->can('review', $document),
+                ],
+            ],
         ]);
     }
 
@@ -152,6 +207,14 @@ class DocumentController extends Controller
         $this->authorize('view', $document);
 
         $action->execute($document);
+
+        AuditLogger::record(
+            action: 'document.reprocess_requested',
+            subject: $document,
+            actor: $request->user(),
+            actorType: ActorType::Human,
+            request: $request,
+        );
 
         if ($request->expectsJson()) {
             return response()->json(['queued' => true]);
@@ -171,6 +234,18 @@ class DocumentController extends Controller
 
         Storage::disk((string) config('agent-finance.documents.disk'))->delete($document->file_path);
 
+        AuditLogger::record(
+            action: 'document.deleted',
+            subject: $document,
+            actor: $request->user(),
+            actorType: ActorType::Human,
+            request: $request,
+            properties: [
+                'filename' => $document->original_filename,
+                'file_hash' => $document->file_hash,
+            ],
+        );
+
         $document->delete();
 
         if ($request->expectsJson()) {
@@ -186,6 +261,14 @@ class DocumentController extends Controller
     public function download(Request $request, Document $document): \Symfony\Component\HttpFoundation\Response
     {
         $this->authorize('view', $document);
+
+        AuditLogger::record(
+            action: 'document.downloaded',
+            subject: $document,
+            actor: $request->user(),
+            actorType: ActorType::Human,
+            request: $request,
+        );
 
         return $this->fileResponse($document);
     }
