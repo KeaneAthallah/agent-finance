@@ -42,7 +42,6 @@ const NAV: { section: string; items: NavItem[] }[] = [
                 label: 'Anomalies',
                 href: '/anomalies',
                 roles: ['admin', 'verifier'],
-                phase: '8',
             },
         ],
     },

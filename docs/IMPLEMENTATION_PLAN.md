@@ -194,11 +194,24 @@ Status legend: ✅ done · 🚧 in progress · ⬜ not started
 - `GenerateEmbeddingsJob` after SIHANDAL matching (advisory, §50);
   chat runs recorded on `ai_runs`/`ai_usage`
 
-### Phase 8 — Anomalies & Financial Analysis ⬜
+### Phase 8 — Anomalies & Financial Analysis ✅
 
-- Extensible anomaly engine (severity/status/resolution lifecycle)
-- Duplicate detection (hash + number/vendor/amount/date + semantic)
-- Document↔SIHANDAL comparison views with evidence on both sides
+- Extensible anomaly engine: rule registry is the extension
+  point (new rules register in `AppServiceProvider`, never
+  hardcoded); severity/status/resolution lifecycle with
+  `resolved_at`/`resolved_by` and audit trail
+- Duplicate detection: same document number (critical), same
+  payee+amount+date composite (high), semantic content
+  similarity via embeddings ≥ 0.95 (high) — all OPD-scoped
+- Anomaly workspace (`/anomalies`): open-indicator queue
+  with severity/type filters, resolve/dismiss decisions
+  (review ability, §36), document links to the SIHANDAL
+  comparison view with evidence on both sides
+- `KnowledgeContent` shared by the embedding job and the
+  semantic rule (same whitelisted format); cosine similarity
+  extracted to `Support\Similarity`
+- FakeAIProvider embeddings are bag-of-words (shared
+  vocabulary → similar vectors), deterministic for tests
 
 ### Phase 9 — Reports, Admin, Cost ⬜
 

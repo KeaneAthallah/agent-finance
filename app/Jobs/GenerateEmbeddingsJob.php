@@ -3,9 +3,9 @@
 namespace App\Jobs;
 
 use App\Models\Document;
-use App\Models\DocumentPage;
 use App\Services\Ai\AIProviderInterface;
 use App\Services\Ai\Chunker;
+use App\Services\Ai\KnowledgeContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -47,7 +47,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
         public readonly int $version,
     ) {}
 
-    public function handle(AIProviderInterface $ai, Chunker $chunker): void
+    public function handle(AIProviderInterface $ai, Chunker $chunker, KnowledgeContent $knowledge): void
     {
         $document = Document::query()->findOrFail($this->documentId);
 
@@ -81,7 +81,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                 return;
             }
 
-            $content = $this->whitelistedContent($document, $extraction->payload ?? []);
+            $content = $knowledge->content($document, $extraction->payload);
 
             // Replace this version's chunks (idempotent re-runs, §38).
             $document->chunks()->where('version', $this->version)->delete();
@@ -135,39 +135,5 @@ final class GenerateEmbeddingsJob implements ShouldQueue
                 'error' => $exception->getMessage(),
             ]);
         }
-    }
-
-    /**
-     * The whitelisted knowledge-base content for a document:
-     * its identity, its structured extraction facts and the
-     * extracted page text — never the raw upload itself.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    private function whitelistedContent(Document $document, array $payload): string
-    {
-        $facts = array_filter($payload, static fn (mixed $value): bool => $value !== null);
-
-        $header = sprintf(
-            'Dokumen: %s. Jenis: %s. Tahun anggaran: %s. Nomor: %s. OPD: %s.',
-            $document->original_filename,
-            $document->documentType->code ?? 'tidak diketahui',
-            (string) ($document->fiscal_year ?? 'tidak diketahui'),
-            (string) ($document->document_number ?? 'tidak diketahui'),
-            (string) ($document->opd->code ?? 'tidak diketahui'),
-        );
-
-        $structured = $facts !== []
-            ? "\nFakta terekstraksi: ".json_encode($facts, JSON_UNESCAPED_UNICODE)
-            : '';
-
-        $pages = $document->pages()
-            ->orderBy('page_number')
-            ->get()
-            ->filter(fn (DocumentPage $page): bool => filled($page->extracted_text))
-            ->map(static fn (DocumentPage $page): string => 'Halaman '.((int) $page->page_number).': '.((string) $page->extracted_text))
-            ->implode("\n");
-
-        return trim($header.$structured."\n".$pages);
     }
 }

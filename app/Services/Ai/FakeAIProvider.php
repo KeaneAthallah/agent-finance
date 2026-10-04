@@ -93,12 +93,28 @@ final class FakeAIProvider implements AIProviderInterface
 
     public function generateEmbedding(string $text, string $model): AiEmbeddingResult
     {
-        // Deterministic pseudo-embedding so tests can assert on it.
-        $vector = [];
-        $hash = md5($text);
+        // Deterministic bag-of-words pseudo-embedding: word order
+        // is ignored, so texts that share vocabulary score similar
+        // vectors — a stand-in for a real semantic model (spec §53).
+        $vector = array_fill(0, 8, 0.0);
 
-        for ($i = 0; $i < 8; $i++) {
-            $vector[] = hexdec(substr($hash, $i * 2, 2)) / 255.0;
+        preg_match_all('/[\p{L}\p{N}]+/u', mb_strtolower($text), $matches);
+
+        foreach ($matches[0] as $word) {
+            $hash = crc32($word);
+            $vector[$hash % 8] += ($hash >> 8) % 2 === 0 ? 1 : -1;
+        }
+
+        $norm = sqrt(array_sum(array_map(
+            static fn (float $value): float => $value * $value,
+            $vector,
+        )));
+
+        if ($norm > 0.0) {
+            $vector = array_map(
+                static fn (float $value): float => $value / $norm,
+                $vector,
+            );
         }
 
         return new AiEmbeddingResult($vector, $model);

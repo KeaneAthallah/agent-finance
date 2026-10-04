@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use App\Models\Document;
 use App\Models\DocumentChunk;
 use App\Models\User;
+use App\Support\Similarity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -45,7 +46,7 @@ final class HybridSearchService
             ->map(function (DocumentChunk $chunk) use ($query, $queryVector): ?array {
                 $score = $this->lexicalScore($query, $chunk->content) * self::LEXICAL_WEIGHT
                     + ($queryVector !== null && $chunk->embedding !== null
-                        ? $this->cosine($queryVector, $chunk->embedding) * self::VECTOR_WEIGHT
+                        ? Similarity::cosine($queryVector, $chunk->embedding) * self::VECTOR_WEIGHT
                         : 0.0);
 
                 if ($score <= 0.0) {
@@ -141,30 +142,6 @@ final class HybridSearchService
         $terms = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($text), flags: PREG_SPLIT_NO_EMPTY) ?: [];
 
         return array_values(array_unique(array_filter($terms, static fn (string $t): bool => mb_strlen($t) > 2)));
-    }
-
-    /**
-     * @param  array<int, float>  $a
-     * @param  array<int, float>  $b
-     */
-    private function cosine(array $a, array $b): float
-    {
-        $dot = 0.0;
-        $normA = 0.0;
-        $normB = 0.0;
-
-        foreach ($a as $i => $value) {
-            $other = $b[$i] ?? 0.0;
-            $dot += $value * $other;
-            $normA += $value * $value;
-            $normB += $other * $other;
-        }
-
-        if ($normA === 0.0 || $normB === 0.0) {
-            return 0.0;
-        }
-
-        return $dot / (sqrt($normA) * sqrt($normB));
     }
 
     private function escapeLike(string $query): string

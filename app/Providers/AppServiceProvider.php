@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Document;
+use App\Models\DocumentAnomaly;
 use App\Models\Opd;
 use App\Models\User;
 use App\Services\Ai\AIProviderInterface;
@@ -21,6 +22,7 @@ use App\Services\Validation\Rules\DuplicateScanRule;
 use App\Services\Validation\Rules\FiscalYearMismatchRule;
 use App\Services\Validation\Rules\LowConfidenceRule;
 use App\Services\Validation\Rules\MissingDocumentNumberRule;
+use App\Services\Validation\Rules\SemanticDuplicateRule;
 use App\Services\Validation\Rules\TotalMismatchRule;
 use App\Services\Validation\ValidationEngine;
 use App\Services\Validation\ValidationRule;
@@ -58,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
             'document' => Document::class,
             'user' => User::class,
             'opd' => Opd::class,
+            'document_anomaly' => DocumentAnomaly::class,
         ]);
 
         // Auto-start processing after upload (spec §30). QueueDocumentProcessing
@@ -146,6 +149,7 @@ class AppServiceProvider extends ServiceProvider
                 MissingDocumentNumberRule::class,
                 LowConfidenceRule::class,
                 DuplicateScanRule::class,
+                SemanticDuplicateRule::class,
             ];
 
             return new ValidationEngine(

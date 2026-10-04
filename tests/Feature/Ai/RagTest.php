@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Ai\AIProviderInterface;
 use App\Services\Ai\Chunker;
 use App\Services\Ai\HybridSearchService;
+use App\Services\Ai\KnowledgeContent;
 use Database\Seeders\AgentFinanceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -76,6 +77,7 @@ it('chunks whitelisted content and stores embeddings with metadata', function ()
     (new GenerateEmbeddingsJob($document->id, 1))->handle(
         app(AIProviderInterface::class),
         app(Chunker::class),
+        app(KnowledgeContent::class),
     );
 
     $chunks = $document->chunks()->get();
@@ -107,6 +109,7 @@ it('never chunks documents without a completed extraction', function () {
     (new GenerateEmbeddingsJob($document->id, 1))->handle(
         app(AIProviderInterface::class),
         app(Chunker::class),
+        app(KnowledgeContent::class),
     );
 
     expect($document->chunks()->count())->toBe(0)
@@ -119,11 +122,11 @@ it('replaces the chunks of the same version on re-run', function () {
     $document = ragReadyDocument();
 
     $job = new GenerateEmbeddingsJob($document->id, 1);
-    $job->handle(app(AIProviderInterface::class), app(Chunker::class));
+    $job->handle(app(AIProviderInterface::class), app(Chunker::class), app(KnowledgeContent::class));
 
     $first = $document->chunks()->pluck('content')->all();
 
-    $job->handle(app(AIProviderInterface::class), app(Chunker::class));
+    $job->handle(app(AIProviderInterface::class), app(Chunker::class), app(KnowledgeContent::class));
 
     // Idempotent: same count and same content, freshly stored.
     expect($document->chunks()->count())->toBe(count($first))
@@ -138,7 +141,7 @@ it('records an advisory failure without touching the document state', function (
     $ai = Mockery::mock(AIProviderInterface::class);
     $ai->shouldReceive('generateEmbedding')->andThrow(new RuntimeException('embedding provider down'));
 
-    (new GenerateEmbeddingsJob($document->id, 1))->handle($ai, app(Chunker::class));
+    (new GenerateEmbeddingsJob($document->id, 1))->handle($ai, app(Chunker::class), app(KnowledgeContent::class));
 
     $run = $document->processingRuns()->where('stage', 'embedding')->sole();
 

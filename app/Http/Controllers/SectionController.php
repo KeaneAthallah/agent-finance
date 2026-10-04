@@ -23,11 +23,6 @@ class SectionController extends Controller
         return $this->placeholder($request, 'validation', 'Validation', 'Validation engine results per document.');
     }
 
-    public function anomalies(Request $request): Response
-    {
-        return $this->placeholder($request, 'anomalies', 'Anomalies', 'Factual anomaly indicators: mismatches, duplicates, unknown references.');
-    }
-
     public function sihandal(Request $request): Response
     {
         return $this->placeholder($request, 'sihandal', 'SIHANDAL', 'Master data and synchronization status.');
@@ -68,12 +63,8 @@ class SectionController extends Controller
     private function phaseFor(string $view): string
     {
         return match ($view) {
-            'review', 'validation' => 'Phase 5 — Review, Validation & Audit',
-            'anomalies' => 'Phase 8 — Anomalies & Financial Analysis',
-            'ai/assistant' => 'Phase 7 — AI Assistant, Tools & RAG',
-            'sihandal' => 'Phase 6 — SIHANDAL Integration',
+            'review', 'validation', 'activity' => 'Phase 5 — Review, Validation & Audit',
             'reports' => 'Phase 9 — Reports, Admin & Cost',
-            'activity' => 'Phase 5 — Review, Validation & Audit',
             'settings', 'admin/index' => 'Phase 9 — Reports, Admin & Cost',
             default => 'Upcoming phase',
         };

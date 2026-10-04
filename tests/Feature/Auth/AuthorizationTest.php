@@ -52,12 +52,23 @@ it('allows only admins into administration', function () {
 
 it('returns the placeholder payload for later-phase sections', function () {
     actingAs(testUser(UserRole::Verifier->value, testOpd()))
-        ->get(route('anomalies.index'))
+        ->get(route('reports.index'))
         ->assertOk()
         ->assertInertia(
             fn ($page) => $page
                 ->component('placeholder')
-                ->where('title', 'Anomalies')
-                ->where('phase', 'Phase 8 — Anomalies & Financial Analysis'),
+                ->where('title', 'Reports')
+                ->where('phase', 'Phase 9 — Reports, Admin & Cost'),
+        );
+});
+
+it('renders the anomaly workspace for reviewers', function () {
+    actingAs(testUser(UserRole::Verifier->value, testOpd()))
+        ->get(route('anomalies.index'))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('anomalies/index')
+                ->where('auth.can.review', true),
         );
 });

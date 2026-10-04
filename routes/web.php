@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\AiAssistantController;
+use App\Http\Controllers\AnomalyController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
@@ -35,7 +36,12 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/review', [ReviewController::class, 'index'])->name('review.index');
         Route::post('/documents/{document}/review', [ReviewController::class, 'store'])->name('documents.review');
         Route::get('/validation', [SectionController::class, 'validation'])->name('validation.index');
-        Route::get('/anomalies', [SectionController::class, 'anomalies'])->name('anomalies.index');
+        Route::get('/anomalies', [AnomalyController::class, 'index'])->name('anomalies.index');
+
+        // Anomaly lifecycle (spec §15, §25): human resolve/dismiss
+        // of factual indicators. Requires the review ability.
+        Route::post('/anomalies/{anomaly}/resolve', [AnomalyController::class, 'resolve'])->name('anomalies.resolve');
+        Route::post('/anomalies/{anomaly}/dismiss', [AnomalyController::class, 'dismiss'])->name('anomalies.dismiss');
         Route::get('/sihandal', [SihandalController::class, 'index'])->name('sihandal.index');
 
         // SIHANDAL human decisions (spec §17, §48): confirm performs
