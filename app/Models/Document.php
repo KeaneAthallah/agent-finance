@@ -32,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $document_number
  * @property array<string, mixed>|null $metadata
  * @property Carbon|null $validated_at
+ * @property Carbon|null $synced_at
  * @property Carbon $created_at
  * @property Carbon $updated_at * @property-read Opd $opd
  * @property-read DocumentType|null $documentType
@@ -39,6 +40,9 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, DocumentReview> $reviews
  * @property-read Collection<int, DocumentValidation> $validations
  * @property-read Collection<int, DocumentAnomaly> $anomalies
+ * @property-read Collection<int, SihandalMatch> $matches
+ * @property-read Collection<int, SihandalSync> $syncs
+ * @property-read Collection<int, DocumentChunk> $chunks
  */
 class Document extends Model
 {
@@ -60,6 +64,7 @@ class Document extends Model
         'document_number',
         'metadata',
         'validated_at',
+        'synced_at',
     ];
 
     protected function casts(): array
@@ -71,6 +76,7 @@ class Document extends Model
             'fiscal_year' => 'integer',
             'metadata' => 'array',
             'validated_at' => 'datetime',
+            'synced_at' => 'datetime',
         ];
     }
 
@@ -158,6 +164,36 @@ class Document extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    /**
+     * SIHANDAL match candidates across all processing versions (§17).
+     *
+     * @return HasMany<SihandalMatch, $this>
+     */
+    public function matches(): HasMany
+    {
+        return $this->hasMany(SihandalMatch::class);
+    }
+
+    /**
+     * SIHANDAL sync attempts with full request/response history (§48).
+     *
+     * @return HasMany<SihandalSync, $this>
+     */
+    public function syncs(): HasMany
+    {
+        return $this->hasMany(SihandalSync::class);
+    }
+
+    /**
+     * RAG chunks of whitelisted content with embeddings (§21, §45).
+     *
+     * @return HasMany<DocumentChunk, $this>
+     */
+    public function chunks(): HasMany
+    {
+        return $this->hasMany(DocumentChunk::class);
     }
 
     /**

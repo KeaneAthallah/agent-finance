@@ -49,17 +49,39 @@ final class FakeSihandalClient implements SihandalApiInterface
     /** @param array<string, mixed> $filters */
     public function belanja(array $filters = []): SihandalCollection
     {
-        return new SihandalCollection(items: [
+        $items = [
             [
                 'id' => 1001,
                 'opd_id' => 1,
+                'opd_code' => '4.01.0',
                 'sub_kegiatan_id' => 1,
                 'rekening' => '5.1.02.01.0001',
                 'uraian' => 'Belanja Bahan Habis Pakai',
                 'amount' => 125000000,
                 'fiscal_year' => 2026,
+                'document_number' => 'SPM-777/2026',
             ],
-        ]);
+            [
+                'id' => 1002,
+                'opd_id' => 2,
+                'opd_code' => '4.02.0',
+                'sub_kegiatan_id' => 2,
+                'rekening' => '5.1.02.01.0002',
+                'uraian' => 'Belanja Bahan Habis Pakai',
+                'amount' => 125000000,
+                'fiscal_year' => 2026,
+                'document_number' => 'SPM-999/2026',
+            ],
+        ];
+
+        if (isset($filters['fiscal_year'])) {
+            $items = array_values(array_filter(
+                $items,
+                static fn (array $item): bool => $item['fiscal_year'] === (int) $filters['fiscal_year'],
+            ));
+        }
+
+        return new SihandalCollection(items: $items);
     }
 
     /** @param array<string, mixed> $filters */
@@ -100,5 +122,22 @@ final class FakeSihandalClient implements SihandalApiInterface
             ['id' => 1, 'year' => 2025, 'is_active' => false],
             ['id' => 2, 'year' => 2026, 'is_active' => true],
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function syncDocument(array $payload): array
+    {
+        $number = is_string($payload['document_number'] ?? null) ? $payload['document_number'] : 'unknown';
+
+        // Deterministic stand-in for the created SIHANDAL resource.
+        return [
+            'id' => 'sync-'.strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $number)),
+            'document_number' => $number,
+            'status' => 'recorded',
+            'recorded_at' => now()->toIso8601String(),
+        ];
     }
 }

@@ -28,11 +28,6 @@ class SectionController extends Controller
         return $this->placeholder($request, 'anomalies', 'Anomalies', 'Factual anomaly indicators: mismatches, duplicates, unknown references.');
     }
 
-    public function aiAssistant(Request $request): Response
-    {
-        return $this->placeholder($request, 'ai/assistant', 'AI Assistant', 'Grounded financial Q&A with tool calling.');
-    }
-
     public function sihandal(Request $request): Response
     {
         return $this->placeholder($request, 'sihandal', 'SIHANDAL', 'Master data and synchronization status.');

@@ -68,6 +68,11 @@ final class ValidateDocumentJob implements ShouldQueue
                 'finished_at' => now(),
                 'duration_ms' => (int) ($run->started_at?->diffInMilliseconds(now()) ?? 0),
             ]);
+
+            // Pipeline continues: SIHANDAL matching runs right after a
+            // completed validation (spec §17) — same processing version.
+            // Advisory only: it never blocks the document's state.
+            MatchSihandalDataJob::dispatch($document->id, $this->version);
         } catch (Throwable $exception) {
             $run->update([
                 'status' => 'failed',

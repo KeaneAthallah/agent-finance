@@ -2,6 +2,8 @@
 
 namespace App\Services\Ai;
 
+use Illuminate\Support\Collection;
+
 /**
  * Deterministic fake provider used in tests and when no real provider is
  * configured. It never performs network calls (spec §53, §54).
@@ -104,11 +106,164 @@ final class FakeAIProvider implements AIProviderInterface
 
     public function chat(AiChatRequest $request): AiChatResult
     {
-        $last = collect($request->messages)->last()['content'] ?? '';
+        $messages = collect($request->messages);
+        $last = $messages->last()['content'] ?? '';
+
+        // Tool results are in context: produce the grounded,
+        // labeled answer from them (deterministic, §53).
+        if ($messages->contains('role', 'tool')) {
+            return $this->groundedAnswer($messages);
+        }
+
+        // No tools available: plain echo, as before.
+        if ($request->tools === []) {
+            return new AiChatResult(
+                content: '[fake] Anda bertanya: '.$last,
+                meta: ['provider' => 'fake'],
+            );
+        }
+
+        // Intent detection: pick the tool whose intent
+        // matches the question and call it with arguments
+        // found in the question text.
+        $intent = $this->detectIntent((string) $last);
+
+        if ($intent === null) {
+            return new AiChatResult(
+                content: '[fake] Anda bertanya: '.$last,
+                meta: ['provider' => 'fake'],
+            );
+        }
 
         return new AiChatResult(
-            content: '[fake] Anda bertanya: '.$last,
-            meta: ['provider' => 'fake'],
+            content: '',
+            toolCalls: [['name' => $intent['tool'], 'arguments' => $intent['arguments']]],
+            meta: ['provider' => 'fake', 'input_tokens' => 12, 'output_tokens' => 8],
         );
+    }
+
+    /**
+     * Deterministic intent → tool selection for tests and
+     * offline development (Indonesian + English keywords).
+     *
+     * @return array{tool: string, arguments: array<string, mixed>}|null
+     */
+    private function detectIntent(string $question): ?array
+    {
+        $question = mb_strtolower($question);
+
+        preg_match('/\b(20\d{2})\b/', $question, $yearMatch);
+        $year = isset($yearMatch[1]) ? (int) $yearMatch[1] : 2026;
+
+        preg_match('/\b(\d+)\b/', $question, $idMatch);
+        $id = isset($idMatch[1]) ? (int) $idMatch[1] : 1;
+
+        $intents = [
+            ['pattern' => '/(anggaran|budget|ringkasan anggaran|total anggaran|jumlah anggaran)/', 'tool' => 'get_budget_summary', 'arguments' => ['fiscal_year' => $year]],
+            ['pattern' => '/(banding|perbandingan|compare|versus|\bsihandal\b)/', 'tool' => 'compare_document_with_sihandal', 'arguments' => ['document_id' => $id]],
+            ['pattern' => '/(cari|search|temukan|find|mencari)/', 'tool' => 'search_documents', 'arguments' => ['query' => $question]],
+            ['pattern' => '/(validasi|anomali|validate|validation)/', 'tool' => 'validate_document', 'arguments' => ['document_id' => $id]],
+            ['pattern' => '/(\bopd\b|unit kerja|satuan kerja)/', 'tool' => 'get_opd', 'arguments' => []],
+            ['pattern' => '/(penerimaan|pendapatan|revenue)/', 'tool' => 'get_revenue', 'arguments' => ['fiscal_year' => $year]],
+            ['pattern' => '/(pengeluaran|belanja|expenditure)/', 'tool' => 'get_expenditure', 'arguments' => ['fiscal_year' => $year]],
+        ];
+
+        foreach ($intents as $intent) {
+            if (preg_match($intent['pattern'], $question) === 1) {
+                return ['tool' => $intent['tool'], 'arguments' => $intent['arguments']];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  Collection<int, array{role: string, content: string}>  $messages
+     */
+    private function groundedAnswer(Collection $messages): AiChatResult
+    {
+        $statements = [];
+        $warnings = 0;
+
+        foreach ($messages->where('role', 'tool') as $message) {
+            /** @var array{name?: mixed, result?: array<string, mixed>, error?: string} $payload */
+            $payload = json_decode((string) $message['content'], true) ?? [];
+
+            $name = is_string($payload['name'] ?? null) ? $payload['name'] : 'tool';
+
+            if (isset($payload['error'])) {
+                $warnings++;
+                $statements[] = [
+                    'label' => ChatStatement::WARNING,
+                    'text' => ucfirst($name).' tidak tersedia: '.$payload['error'],
+                    'source' => $name,
+                ];
+
+                continue;
+            }
+
+            $result = $payload['result'] ?? [];
+            $statements[] = [
+                'label' => ChatStatement::FACT,
+                'text' => $this->factLine($name, $result),
+                'source' => $name,
+            ];
+        }
+
+        if ($statements === []) {
+            $statements[] = [
+                'label' => ChatStatement::WARNING,
+                'text' => 'Tidak ada hasil tool yang dapat digunakan.',
+                'source' => null,
+            ];
+        }
+
+        $statements[] = [
+            'label' => ChatStatement::AI_INTERPRETATION,
+            'text' => 'Ringkasan disusun dari '.count($statements).' pernyataan FACT'.($warnings > 0 ? " dan {$warnings} peringatan" : '').'.',
+            'source' => null,
+        ];
+
+        $content = json_encode([
+            'summary' => 'Jawaban disusun dari hasil tool yang tersedia.',
+            'statements' => $statements,
+        ]);
+
+        return new AiChatResult(
+            content: (string) $content,
+            meta: ['provider' => 'fake', 'input_tokens' => 40, 'output_tokens' => 30],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $result
+     */
+    private function factLine(string $tool, array $result): string
+    {
+        return match ($tool) {
+            'get_budget_summary' => sprintf(
+                'Total anggaran TA %d: Rp%s dari %d dokumen.',
+                (int) ($result['fiscal_year'] ?? 0),
+                number_format((float) ($result['total_amount'] ?? 0), 0, ',', '.'),
+                (int) ($result['document_count'] ?? 0),
+            ),
+            'search_documents' => sprintf(
+                'Ditemukan %d potongan dokumen yang cocok.',
+                (int) ($result['hit_count'] ?? 0),
+            ),
+            'compare_document_with_sihandal' => sprintf(
+                'Dokumen %s: %d kandidat SIHANDAL.',
+                (string) ($result['document_number'] ?? '?'),
+                count($result['candidates'] ?? []),
+            ),
+            'validate_document' => sprintf(
+                'Status dokumen: %s.',
+                (string) ($result['status'] ?? '?'),
+            ),
+            'get_opd' => sprintf('Ditemukan %d OPD.', count($result['opds'] ?? [])),
+            'get_revenue' => sprintf('Ditemukan %d catatan penerimaan.', count($result['penerimaan'] ?? [])),
+            'get_expenditure' => sprintf('Ditemukan %d catatan pengeluaran.', count($result['pengeluaran'] ?? [])),
+            default => 'Data: '.mb_substr((string) json_encode($result), 0, 200),
+        };
     }
 }

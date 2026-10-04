@@ -11,6 +11,8 @@ use App\Http\Resources\DocumentResource;
 use App\Models\Document;
 use App\Models\DocumentAnomaly;
 use App\Models\DocumentType;
+use App\Models\SihandalMatch;
+use App\Models\SihandalSync;
 use App\Models\User;
 use App\Support\ActorType;
 use App\Support\AuditLogger;
@@ -154,6 +156,19 @@ class DocumentController extends Controller
             ->with('reviewer:id,name')
             ->get(['id', 'decision', 'notes', 'reviewer_id', 'created_at']);
 
+        // SIHANDAL candidates (confidence-ordered, §17) and sync
+        // history with full request/response (§48).
+        $matches = $document->matches()
+            ->orderByDesc('confidence')
+            ->orderByDesc('id')
+            ->with('confirmedBy:id,name')
+            ->get(['id', 'version', 'entity_type', 'entity_id', 'sihandal_data', 'confidence', 'status', 'confirmed_by', 'confirmed_at', 'created_at']);
+
+        $syncs = $document->syncs()
+            ->orderByDesc('id')
+            ->with('user:id,name')
+            ->get(['id', 'sihandal_match_id', 'user_id', 'endpoint', 'method', 'request', 'response', 'http_status', 'status', 'error', 'attempts', 'created_at']);
+
         return Inertia::render('documents/show', [
             'document' => (new DocumentResource($document))->resolve($request),
             'previewUrl' => $this->temporaryPreviewUrl($document),
@@ -195,6 +210,38 @@ class DocumentController extends Controller
                 'can' => [
                     'review' => $user->can('review', $document),
                 ],
+            ],
+            'sihandal' => [
+                'matches' => $matches->map(fn (SihandalMatch $match) => [
+                    'id' => $match->id,
+                    'version' => $match->version,
+                    'entity_type' => $match->entity_type,
+                    'entity_id' => $match->entity_id,
+                    'sihandal_data' => $match->sihandal_data,
+                    'confidence' => $match->confidence,
+                    'status' => $match->status->value,
+                    'confirmed_by' => $match->confirmedBy !== null
+                        ? ['id' => $match->confirmedBy->id, 'name' => $match->confirmedBy->name]
+                        : null,
+                    'confirmed_at' => $match->confirmed_at?->toIso8601String(),
+                    'created_at' => $match->created_at->toIso8601String(),
+                ])->all(),
+                'syncs' => $syncs->map(fn (SihandalSync $sync) => [
+                    'id' => $sync->id,
+                    'sihandal_match_id' => $sync->sihandal_match_id,
+                    'user' => $sync->user !== null
+                        ? ['id' => $sync->user->id, 'name' => $sync->user->name]
+                        : null,
+                    'endpoint' => $sync->endpoint,
+                    'method' => $sync->method,
+                    'request' => $sync->request,
+                    'response' => $sync->response,
+                    'http_status' => $sync->http_status,
+                    'status' => $sync->status->value,
+                    'error' => $sync->error,
+                    'attempts' => $sync->attempts,
+                    'created_at' => $sync->created_at->toIso8601String(),
+                ])->all(),
             ],
         ]);
     }

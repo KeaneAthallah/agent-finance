@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SectionController;
+use App\Http\Controllers\SihandalController;
+use App\Http\Controllers\SihandalMatchController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -33,10 +36,21 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/documents/{document}/review', [ReviewController::class, 'store'])->name('documents.review');
         Route::get('/validation', [SectionController::class, 'validation'])->name('validation.index');
         Route::get('/anomalies', [SectionController::class, 'anomalies'])->name('anomalies.index');
-        Route::get('/sihandal', [SectionController::class, 'sihandal'])->name('sihandal.index');
+        Route::get('/sihandal', [SihandalController::class, 'index'])->name('sihandal.index');
+
+        // SIHANDAL human decisions (spec §17, §48): confirm performs
+        // the sync through the API — the only write path to the
+        // system of record. Requires the review ability.
+        Route::post('/documents/{document}/sihandal/matches/{match}/confirm', [SihandalMatchController::class, 'confirm'])->name('documents.sihandal.match.confirm');
+        Route::post('/documents/{document}/sihandal/matches/{match}/reject', [SihandalMatchController::class, 'reject'])->name('documents.sihandal.match.reject');
+        Route::post('/documents/{document}/sihandal/syncs/{sync}/retry', [SihandalMatchController::class, 'retry'])->name('documents.sihandal.sync.retry');
     });
 
-    Route::get('/ai-assistant', [SectionController::class, 'aiAssistant'])->name('ai.assistant');
+    // AI assistant (spec §19, §20, §47): read-only, grounded
+    // chat. Tools enforce OPD isolation and view policies.
+    Route::get('/ai-assistant', [AiAssistantController::class, 'index'])->name('ai.assistant');
+    Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai.assistant.chat');
+
     Route::get('/activity', [ActivityController::class, 'index'])->name('activity.index');
     Route::get('/reports', [SectionController::class, 'reports'])->name('reports.index');
 

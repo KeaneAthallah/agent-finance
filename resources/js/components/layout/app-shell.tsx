@@ -54,7 +54,6 @@ const NAV: { section: string; items: NavItem[] }[] = [
                 label: 'SIHANDAL',
                 href: '/sihandal',
                 roles: ['admin', 'verifier'],
-                phase: '6',
             },
             { label: 'Reports', href: '/reports', phase: '9' },
             { label: 'Activity', href: '/activity' },

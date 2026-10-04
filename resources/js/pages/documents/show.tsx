@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import { AppShell } from '@/components/layout/app-shell';
 import {
@@ -87,7 +88,10 @@ type Validation = {
     version: number;
     engine_version: string;
     result: string;
-    summary: { anomaly_count?: number; by_type?: Record<string, number> } | null;
+    summary: {
+        anomaly_count?: number;
+        by_type?: Record<string, number>;
+    } | null;
     duration_ms: number | null;
     created_at: string;
     anomalies: Anomaly[];
@@ -101,6 +105,34 @@ type ReviewRecord = {
     created_at: string;
 };
 
+type SihandalMatch = {
+    id: number;
+    version: number;
+    entity_type: string;
+    entity_id: string;
+    sihandal_data: Record<string, string | number | null>;
+    confidence: number;
+    status: string;
+    confirmed_by?: { id: number; name: string } | null;
+    confirmed_at: string | null;
+    created_at: string;
+};
+
+type SihandalSync = {
+    id: number;
+    sihandal_match_id: number | null;
+    user?: { id: number; name: string } | null;
+    endpoint: string;
+    method: string;
+    request: Record<string, unknown>;
+    response: Record<string, unknown> | null;
+    http_status: number | null;
+    status: string;
+    error: string | null;
+    attempts: number;
+    created_at: string;
+};
+
 type Props = InertiaPageProps & {
     document: DocumentDetail;
     previewUrl: string;
@@ -109,6 +141,7 @@ type Props = InertiaPageProps & {
     extraction: Extraction | null;
     validation: Validation | null;
     reviews: ReviewRecord[];
+    sihandal: { matches: SihandalMatch[]; syncs: SihandalSync[] };
     auth: { can: { review: boolean } };
 };
 
@@ -149,6 +182,24 @@ const STAGE_ORDER = [
     'validation',
     'matching',
 ];
+
+const MATCH_STATUS_VARIANTS: Record<
+    string,
+    'neutral' | 'blue' | 'green' | 'amber' | 'red'
+> = {
+    pending: 'amber',
+    confirmed: 'green',
+    rejected: 'red',
+};
+
+const SYNC_STATUS_VARIANTS: Record<
+    string,
+    'neutral' | 'blue' | 'green' | 'amber' | 'red'
+> = {
+    pending: 'amber',
+    success: 'green',
+    failed: 'red',
+};
 
 function confidenceVariant(confidence: number | null): {
     variant: 'green' | 'amber' | 'red' | 'neutral';
@@ -198,12 +249,15 @@ export default function DocumentShow({
     extraction,
     validation,
     reviews,
+    sihandal,
     auth,
 }: Props) {
     const reviewForm = useForm<{ decision: string; notes: string }>({
         decision: '',
         notes: '',
     });
+
+    const [syncBusy, setSyncBusy] = useState(false);
 
     function submitReview(decision: string) {
         reviewForm.clearErrors();
@@ -215,6 +269,33 @@ export default function DocumentShow({
                 preserveScroll: true,
                 onSuccess: () => reviewForm.reset(),
             },
+        );
+    }
+
+    function confirmMatch(matchId: number) {
+        setSyncBusy(true);
+        router.post(
+            `/documents/${document.id}/sihandal/matches/${matchId}/confirm`,
+            {},
+            { preserveScroll: true, onFinish: () => setSyncBusy(false) },
+        );
+    }
+
+    function rejectMatch(matchId: number) {
+        setSyncBusy(true);
+        router.post(
+            `/documents/${document.id}/sihandal/matches/${matchId}/reject`,
+            {},
+            { preserveScroll: true, onFinish: () => setSyncBusy(false) },
+        );
+    }
+
+    function retrySync(syncId: number) {
+        setSyncBusy(true);
+        router.post(
+            `/documents/${document.id}/sihandal/syncs/${syncId}/retry`,
+            {},
+            { preserveScroll: true, onFinish: () => setSyncBusy(false) },
         );
     }
 
@@ -626,9 +707,7 @@ export default function DocumentShow({
                                                                 ] ?? 'neutral'
                                                             }
                                                         >
-                                                            {
-                                                                anomaly.severity
-                                                            }
+                                                            {anomaly.severity}
                                                         </Badge>
                                                         <Badge
                                                             variant={
@@ -648,12 +727,10 @@ export default function DocumentShow({
                                                     </p>
                                                 ) : null}
                                                 <p className="mt-1 text-[11px] tracking-wide text-neutral-400 uppercase">
-                                                    {
-                                                        anomaly.type.replaceAll(
-                                                            '_',
-                                                            ' ',
-                                                        )
-                                                    }
+                                                    {anomaly.type.replaceAll(
+                                                        '_',
+                                                        ' ',
+                                                    )}
                                                 </p>
                                             </li>
                                         ))}
@@ -752,9 +829,7 @@ export default function DocumentShow({
                                         variant="outline"
                                         disabled={reviewForm.processing}
                                         onClick={() =>
-                                            submitReview(
-                                                'reanalysis_requested',
-                                            )
+                                            submitReview('reanalysis_requested')
                                         }
                                     >
                                         Request re-analysis
@@ -771,6 +846,196 @@ export default function DocumentShow({
                                 Verifier role required to review.
                             </p>
                         )}
+                    </CardContent>
+                </Card>
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>SIHANDAL</CardTitle>
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                            Match candidates from the system of record
+                            (confidence-ordered). Confirming a candidate on an
+                            approved document syncs it through the API — the
+                            only write path to SIHANDAL.
+                        </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4 p-4">
+                        {sihandal.matches.length > 0 ? (
+                            <ul className="space-y-2">
+                                {sihandal.matches.map((match) => (
+                                    <li
+                                        key={match.id}
+                                        className="rounded-md border border-neutral-200 p-2.5 text-sm"
+                                    >
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Badge
+                                                    variant={
+                                                        confidenceVariant(
+                                                            match.confidence,
+                                                        ).variant
+                                                    }
+                                                >
+                                                    {match.confidence}% match
+                                                </Badge>
+                                                <span className="font-medium text-neutral-900">
+                                                    {String(
+                                                        match.sihandal_data
+                                                            .uraian ??
+                                                            match.entity_type,
+                                                    )}
+                                                </span>
+                                                <span className="text-xs text-neutral-500">
+                                                    {String(
+                                                        match.sihandal_data
+                                                            .rekening ??
+                                                            match.entity_id,
+                                                    )}
+                                                    {match.sihandal_data
+                                                        .amount !== undefined
+                                                        ? ` · Rp ${Number(
+                                                              match
+                                                                  .sihandal_data
+                                                                  .amount,
+                                                          ).toLocaleString()}`
+                                                        : ''}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Badge
+                                                    variant={
+                                                        MATCH_STATUS_VARIANTS[
+                                                            match.status
+                                                        ] ?? 'neutral'
+                                                    }
+                                                >
+                                                    {match.status}
+                                                </Badge>
+                                                {auth.can.review &&
+                                                document.status ===
+                                                    'approved' &&
+                                                match.status === 'pending' ? (
+                                                    <div className="flex gap-1.5">
+                                                        <Button
+                                                            size="sm"
+                                                            disabled={syncBusy}
+                                                            onClick={() =>
+                                                                confirmMatch(
+                                                                    match.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            Confirm &amp; sync
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={syncBusy}
+                                                            onClick={() =>
+                                                                rejectMatch(
+                                                                    match.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        <p className="mt-1 text-xs text-neutral-500">
+                                            v{match.version} · entity{' '}
+                                            {match.entity_type}/
+                                            {match.entity_id}
+                                            {match.confirmed_by?.name
+                                                ? ` · ${match.status === 'rejected' ? 'rejected' : 'confirmed'} by ${match.confirmed_by.name}${
+                                                      match.confirmed_at
+                                                          ? ` on ${new Date(
+                                                                match.confirmed_at,
+                                                            ).toLocaleString()}`
+                                                          : ''
+                                                  }`
+                                                : ''}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-neutral-500">
+                                No SIHANDAL match candidates yet. Candidates
+                                appear once validation completes and SIHANDAL
+                                returns possible matches for the extracted data.
+                            </p>
+                        )}
+
+                        {sihandal.syncs.length > 0 ? (
+                            <div>
+                                <h3 className="mb-2 text-sm font-semibold text-neutral-900">
+                                    Sync history
+                                </h3>
+                                <ul className="space-y-2">
+                                    {sihandal.syncs.map((sync) => (
+                                        <li
+                                            key={sync.id}
+                                            className="rounded-md border border-neutral-200 p-2.5 text-sm"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Badge
+                                                        variant={
+                                                            SYNC_STATUS_VARIANTS[
+                                                                sync.status
+                                                            ] ?? 'neutral'
+                                                        }
+                                                    >
+                                                        {sync.status}
+                                                    </Badge>
+                                                    <span className="font-mono text-xs text-neutral-700">
+                                                        {sync.method}{' '}
+                                                        {sync.endpoint}
+                                                    </span>
+                                                    {sync.http_status !==
+                                                    null ? (
+                                                        <span className="text-xs text-neutral-500">
+                                                            HTTP{' '}
+                                                            {sync.http_status}
+                                                        </span>
+                                                    ) : null}
+                                                    <span className="text-xs text-neutral-500">
+                                                        attempt {sync.attempts}
+                                                    </span>
+                                                </div>
+                                                {auth.can.review &&
+                                                (sync.status === 'pending' ||
+                                                    sync.status ===
+                                                        'failed') ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={syncBusy}
+                                                        onClick={() =>
+                                                            retrySync(sync.id)
+                                                        }
+                                                    >
+                                                        Retry
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                            <p className="mt-1 text-xs text-neutral-500">
+                                                {sync.user?.name
+                                                    ? `by ${sync.user.name} · `
+                                                    : ''}
+                                                {new Date(
+                                                    sync.created_at,
+                                                ).toLocaleString()}
+                                                {sync.error
+                                                    ? ` · ${sync.error}`
+                                                    : ''}
+                                            </p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null}
                     </CardContent>
                 </Card>
             </div>

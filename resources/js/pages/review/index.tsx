@@ -1,12 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { AppShell } from '@/components/layout/app-shell';
-import {
-    Badge,
-    Button,
-    Card,
-    CardContent,
-    EmptyState,
-} from '@/components/ui';
+import { Badge, Button, Card, CardContent, EmptyState } from '@/components/ui';
 import type { InertiaPageProps } from '@/types';
 
 type DocumentItem = {
@@ -19,6 +13,7 @@ type DocumentItem = {
     document_type?: { id: number; code: string; name: string } | null;
     opd?: { id: number; code: string; name: string } | null;
     uploader?: { id: number; name: string } | null;
+    validated_at: string | null;
     created_at: string;
 };
 
@@ -132,16 +127,13 @@ export default function ReviewIndex({
                                                         ?.name ?? '—'}
                                                 </td>
                                                 <td className="py-2 pr-4">
-                                                    {document.opd?.name ??
-                                                        '—'}
+                                                    {document.opd?.name ?? '—'}
                                                 </td>
                                                 <td className="py-2 pr-4">
                                                     {openCount > 0 ? (
                                                         <span className="flex items-center gap-1.5">
                                                             <span className="tabular-nums">
-                                                                {
-                                                                    openCount
-                                                                }
+                                                                {openCount}
                                                             </span>
                                                             {severity ? (
                                                                 <Badge

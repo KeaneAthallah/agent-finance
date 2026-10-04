@@ -14,6 +14,8 @@ final class PromptRegistry
 {
     public const EXTRACTION_PROMPT = 'financial_extraction';
 
+    public const CHAT_PROMPT = 'assistant_chat';
+
     public function __construct() {}
 
     /**

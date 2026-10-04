@@ -143,30 +143,56 @@ Status legend: ✅ done · 🚧 in progress · ⬜ not started
       fallback, version history, provider-failure state, stale-version
       guard, UI payload, token usage — 10 new tests, 67 total
 
-### Phase 5 — Review, Validation, Audit ⬜
+### Phase 5 — Review, Validation, Audit ✅
 
-- `document_reviews`, `document_validations`, `document_anomalies`,
-  `audit_logs` migrations
-- Validation engine (rule classes): TOTAL_MISMATCH, FISCAL_YEAR_MISMATCH,
-  MISSING_DOCUMENT_NUMBER, LOW_CONFIDENCE, duplicate scan
-- Review queue page; approve/reject/request re-analysis flows; every manual
-  correction audited (actor human vs AI distinguished)
+- [x] `document_reviews`, `document_validations`, `document_anomalies`,
+      `audit_logs` migrations
+- [x] Validation engine (rule classes): TOTAL_MISMATCH, FISCAL_YEAR_MISMATCH,
+      MISSING_DOCUMENT_NUMBER, LOW_CONFIDENCE, duplicate scan
+- [x] Review queue page; approve/reject/request re-analysis flows; every manual
+      correction audited (actor human vs AI distinguished)
+- [x] Auto-approval of clean, confident extractions; idempotent re-validation;
+      system-actor audit entries for validation routing
 
-### Phase 6 — SIHANDAL Integration ⬜
+### Phase 6 — SIHANDAL Integration ✅
 
-- `SihandalApiInterface` + `SihandalClient` + `FakeSihandalClient`
-- `sihandal_matches`, `sihandal_syncs` migrations; matching job + candidates
-  UI (confidence-ordered); confirm/reject match actions
-- Sync action with full request/response history; pending-retry on failure;
-  Sanctum-protected `/api/v1` for machine clients
+- [x] `SihandalApiInterface` + `SihandalClient` (cached reads,
+      uncached `syncDocument` write) + `FakeSihandalClient`
+      (deterministic belanja fixtures, offline `syncDocument`)
+- [x] `sihandal_matches` + `sihandal_syncs` migrations +
+      `documents.synced_at`; `MatchSihandalDataJob` dispatched
+      after `ValidateDocumentJob` (same version, advisory —
+      unreachable SIHANDAL never blocks the pipeline, §50)
+- [x] `MatchingService`: explainable 0–100 scoring (number 50 /
+      amount 30 / fiscal year 10 / OPD 10), pending candidates
+      replaced per version, confirmed/rejected kept as history
+- [x] `SyncToSihandalAction`: full request/response persisted per
+      attempt; connection failure → pending + retryable (same
+      payload); API error → `sync_failed` + audited; confirm/
+      reject/retry flows with review ability + OPD isolation
+- [x] SIHANDAL section page (counts, confidence-ordered
+      candidates, sync history) + detail-page SIHANDAL pane
+- [x] Sanctum-protected `/api/v1` for machine clients (list,
+      show, upload, review, match candidates, confirm/sync) —
+      same OPD isolation and policies as the UI (§43)
+- [x] `phpunit.xml` hardening: `<server>` + forced `<env>` pins
+      so ambient OS env never leaks into tests
+- [x] Tests: matching order/idempotency/history, failure-safe
+      matching, confirm/reject/retry, OPD isolation, API
+      clients, UI payloads — 19 new tests, 110 total
 
-### Phase 7 — AI Assistant, Tools, RAG ⬜
+### Phase 7 — AI Assistant, Tools, RAG ✅
 
 - Tool layer (`get_budget_summary`, `search_documents`,
-  `compare_document_with_sihandal`, ...) — read-only
-- Chat page with FACT/CALCULATION/AI INTERPRETATION/WARNING labels
-- `document_chunks` + embeddings (whitelisted content only, metadata
-  filters: OPD, fiscal year, type) + hybrid search (SQL + vector)
+  `compare_document_with_sihandal`, `get_opd`, `get_revenue`,
+  `get_expenditure`, `validate_document`) — read-only, OPD-scoped
+- Chat page with FACT/CALCULATION/AI INTERPRETATION/WARNING labels;
+  tool errors surface as WARNING, never leak out-of-scope IDs
+- `document_chunks` + embeddings (whitelisted content only —
+  completed extractions; metadata filters: OPD, fiscal year,
+  type) + hybrid search (SQL + cosine similarity in PHP)
+- `GenerateEmbeddingsJob` after SIHANDAL matching (advisory, §50);
+  chat runs recorded on `ai_runs`/`ai_usage`
 
 ### Phase 8 — Anomalies & Financial Analysis ⬜
 

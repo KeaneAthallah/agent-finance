@@ -4,6 +4,7 @@ namespace App\Services\Sihandal;
 
 use App\Support\SihandalCollection;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -72,6 +73,28 @@ final class SihandalClient implements SihandalApiInterface
     public function tahunAnggaran(array $filters = []): SihandalCollection
     {
         return $this->get('tahun-anggaran', $filters);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     *
+     * @throws ConnectionException when SIHANDAL is unreachable
+     * @throws RequestException on API errors
+     */
+    public function syncDocument(array $payload): array
+    {
+        // Writes are never cached (spec §50): each sync must reach
+        // the system of record exactly once per attempt.
+        $response = Http::baseUrl((string) config('agent-finance.sihandal.base_url'))
+            ->withToken((string) config('agent-finance.sihandal.api_key'))
+            ->timeout((int) config('agent-finance.sihandal.timeout', 15))
+            ->acceptJson()
+            ->post('/api/v1/documents', $payload);
+
+        $response->throw();
+
+        return $response->json() ?? [];
     }
 
     /**
