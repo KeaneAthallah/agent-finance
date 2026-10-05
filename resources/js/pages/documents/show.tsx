@@ -1,14 +1,36 @@
-import { useState } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
+import { FormEvent, useState } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
+import DocumentController from '@/actions/App/Http/Controllers/DocumentController';
+import ReviewController from '@/actions/App/Http/Controllers/ReviewController';
+import SihandalMatchController from '@/actions/App/Http/Controllers/SihandalMatchController';
+import {
+    AlertCircleIcon,
+    AiIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    DownloadIcon,
+    EyeIcon,
+    InfoIcon,
+    RefreshIcon,
+    ScanIcon,
+} from '@/components/icons';
 import {
     Badge,
     Button,
     Card,
     CardContent,
+    CardDescription,
     CardHeader,
     CardTitle,
+    ConfidenceBar,
+    FieldRow,
     Label,
+    PageHeader,
+    SectionTitle,
+    StatusBadge,
+    Textarea,
+    confidenceColor,
 } from '@/components/ui';
 import type { InertiaPageProps } from '@/types';
 
@@ -142,7 +164,7 @@ type Props = InertiaPageProps & {
     validation: Validation | null;
     reviews: ReviewRecord[];
     sihandal: { matches: SihandalMatch[]; syncs: SihandalSync[] };
-    auth: { can: { review: boolean } };
+    can: { review: boolean };
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -155,25 +177,6 @@ const STAGE_LABELS: Record<string, string> = {
     matching: 'SIHANDAL matching',
 };
 
-const SEVERITY_VARIANTS: Record<
-    string,
-    'neutral' | 'blue' | 'green' | 'amber' | 'red' | 'purple'
-> = {
-    info: 'neutral',
-    warning: 'amber',
-    high: 'red',
-    critical: 'red',
-};
-
-const DECISION_VARIANTS: Record<
-    string,
-    'neutral' | 'blue' | 'green' | 'amber' | 'red' | 'purple'
-> = {
-    approved: 'green',
-    rejected: 'red',
-    reanalysis_requested: 'amber',
-};
-
 const STAGE_ORDER = [
     'text_extraction',
     'ocr',
@@ -182,6 +185,23 @@ const STAGE_ORDER = [
     'validation',
     'matching',
 ];
+
+const SEVERITY_VARIANTS: Record<string, 'neutral' | 'blue' | 'amber' | 'red'> =
+    {
+        info: 'blue',
+        warning: 'amber',
+        high: 'red',
+        critical: 'red',
+    };
+
+const DECISION_VARIANTS: Record<
+    string,
+    'neutral' | 'blue' | 'green' | 'amber' | 'red'
+> = {
+    approved: 'green',
+    rejected: 'red',
+    reanalysis_requested: 'amber',
+};
 
 const MATCH_STATUS_VARIANTS: Record<
     string,
@@ -200,25 +220,6 @@ const SYNC_STATUS_VARIANTS: Record<
     success: 'green',
     failed: 'red',
 };
-
-function confidenceVariant(confidence: number | null): {
-    variant: 'green' | 'amber' | 'red' | 'neutral';
-    label: string;
-} {
-    if (confidence == null) {
-        return { variant: 'neutral', label: 'n/a' };
-    }
-
-    if (confidence >= 85) {
-        return { variant: 'green', label: `${confidence}%` };
-    }
-
-    if (confidence >= 60) {
-        return { variant: 'amber', label: `${confidence}%` };
-    }
-
-    return { variant: 'red', label: `${confidence}%` };
-}
 
 const FIELD_LABELS: Record<string, string> = {
     document_number: 'Document number',
@@ -241,6 +242,27 @@ const FIELD_LABELS: Record<string, string> = {
     total_budget: 'Total budget',
 };
 
+function fieldLabel(field: string): string {
+    return FIELD_LABELS[field] ?? field.replaceAll('_', ' ');
+}
+
+function formatRupiah(value: string | number): string {
+    const numeric =
+        typeof value === 'string' ? Number.parseFloat(value) : value;
+
+    return Number.isFinite(numeric)
+        ? `Rp ${numeric.toLocaleString('id-ID')}`
+        : String(value);
+}
+
+function confidenceLabel(confidence: number | null): string {
+    if (confidence == null) {
+        return 'n/a';
+    }
+
+    return `${confidence}%`;
+}
+
 export default function DocumentShow({
     document,
     previewUrl,
@@ -250,7 +272,7 @@ export default function DocumentShow({
     validation,
     reviews,
     sihandal,
-    auth,
+    can,
 }: Props) {
     const reviewForm = useForm<{ decision: string; notes: string }>({
         decision: '',
@@ -262,8 +284,9 @@ export default function DocumentShow({
     function submitReview(decision: string) {
         reviewForm.clearErrors();
         reviewForm.setData('decision', decision);
+
         router.post(
-            `/documents/${document.id}/review`,
+            ReviewController.store({ document: document.id }).url,
             { decision, notes: reviewForm.data.notes },
             {
                 preserveScroll: true,
@@ -274,8 +297,12 @@ export default function DocumentShow({
 
     function confirmMatch(matchId: number) {
         setSyncBusy(true);
+
         router.post(
-            `/documents/${document.id}/sihandal/matches/${matchId}/confirm`,
+            SihandalMatchController.confirm({
+                document: document.id,
+                match: matchId,
+            }).url,
             {},
             { preserveScroll: true, onFinish: () => setSyncBusy(false) },
         );
@@ -283,8 +310,12 @@ export default function DocumentShow({
 
     function rejectMatch(matchId: number) {
         setSyncBusy(true);
+
         router.post(
-            `/documents/${document.id}/sihandal/matches/${matchId}/reject`,
+            SihandalMatchController.reject({
+                document: document.id,
+                match: matchId,
+            }).url,
             {},
             { preserveScroll: true, onFinish: () => setSyncBusy(false) },
         );
@@ -292,379 +323,296 @@ export default function DocumentShow({
 
     function retrySync(syncId: number) {
         setSyncBusy(true);
+
         router.post(
-            `/documents/${document.id}/sihandal/syncs/${syncId}/retry`,
+            SihandalMatchController.retry({
+                document: document.id,
+                sync: syncId,
+            }).url,
             {},
             { preserveScroll: true, onFinish: () => setSyncBusy(false) },
         );
     }
 
+    function retryProcessing() {
+        router.post(
+            DocumentController.process({ document: document.id }).url,
+            {},
+            { preserveScroll: true },
+        );
+    }
+
+    const failedStage = pipeline.some((run) => run.status === 'failed');
+
+    // AI findings, bucketed by confidence so the reviewer always
+    // knows what to trust and what to verify.
+    const findings =
+        extraction?.status === 'completed'
+            ? bucketFindings(extraction.fields)
+            : null;
+
     return (
-        <AppShell title="Document detail">
+        <AppShell
+            title="Document detail"
+            subtitle={document.document_type?.name}
+        >
             <Head title={document.original_filename} />
-            <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-base font-semibold text-neutral-900">
-                        {document.original_filename}
-                    </h2>
-                    <Badge variant="blue">
-                        {document.status.replaceAll('_', ' ')}
-                    </Badge>
-                </div>
-                <a href={previewUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm">
-                        Open document
-                    </Button>
-                </a>
-            </div>{' '}
-            <div className="grid gap-4 lg:grid-cols-3">
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Preview</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                        <div
-                            id="document-page-1"
-                            className="flex h-64 items-center justify-center rounded border border-dashed border-neutral-300 bg-neutral-50 text-sm text-neutral-500 transition-shadow"
+
+            <PageHeader
+                title={document.original_filename}
+                description={`${document.document_number ?? 'No document number'} · ${document.file_size_human}${document.page_count ? ` · ${document.page_count} pages` : ''}`}
+                actions={
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={retryProcessing}
+                            disabled={!failedStage}
                         >
-                            Inline page viewer (page images + bbox highlights)
-                            lands with the review workspace. Use “Open document”
-                            for the full preview.
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Metadata</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                        <Row
-                            label="Type"
-                            value={
-                                document.document_type?.name ?? 'Unclassified'
-                            }
-                        />
-                        <Row label="OPD" value={document.opd?.name ?? '—'} />
-                        <Row
-                            label="Fiscal year"
-                            value={document.fiscal_year?.toString() ?? '—'}
-                        />
-                        <Row
-                            label="Document number"
-                            value={document.document_number ?? '—'}
-                        />
-                        <Row
-                            label="Pages"
-                            value={document.page_count?.toString() ?? '—'}
-                        />
-                        <Row label="Size" value={document.file_size_human} />
-                        <Row
-                            label="Uploaded by"
-                            value={document.uploader?.name ?? '—'}
-                        />
-                        <Row
-                            label="Uploaded at"
-                            value={new Date(
-                                document.created_at,
-                            ).toLocaleString()}
-                        />
-                    </CardContent>
-                </Card>
-            </div>{' '}
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Processing pipeline</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                        <ol className="space-y-2">
-                            {STAGE_ORDER.map((stage) => {
-                                const run = [...pipeline]
-                                    .reverse()
-                                    .find((r) => r.stage === stage);
-
-                                const state = !run
-                                    ? 'pending'
-                                    : run.status === 'completed'
-                                      ? 'done'
-                                      : run.status === 'failed'
-                                        ? 'failed'
-                                        : 'running';
-
-                                return (
-                                    <li
-                                        key={stage}
-                                        className="flex items-center justify-between text-sm"
-                                    >
-                                        <span className="flex items-center gap-2">
-                                            <span
-                                                className={
-                                                    state === 'done'
-                                                        ? 'text-green-600'
-                                                        : state === 'failed'
-                                                          ? 'text-red-600'
-                                                          : state === 'running'
-                                                            ? 'animate-pulse text-blue-600'
-                                                            : 'text-neutral-300'
-                                                }
-                                            >
-                                                {state === 'done'
-                                                    ? '✓'
-                                                    : state === 'failed'
-                                                      ? '✕'
-                                                      : state === 'running'
-                                                        ? '●'
-                                                        : '○'}
-                                            </span>
-                                            <span
-                                                className={
-                                                    state === 'pending'
-                                                        ? 'text-neutral-400'
-                                                        : 'text-neutral-800'
-                                                }
-                                            >
-                                                {STAGE_LABELS[stage] ?? stage}
-                                            </span>
-                                        </span>
-                                        {run?.error ? (
-                                            <span
-                                                className="max-w-[50%] truncate text-xs text-red-600"
-                                                title={run.error}
-                                            >
-                                                {run.error}
-                                            </span>
-                                        ) : run && run.duration_ms != null ? (
-                                            <span className="text-xs text-neutral-400 tabular-nums">
-                                                {(
-                                                    run.duration_ms / 1000
-                                                ).toFixed(1)}
-                                                s
-                                            </span>
-                                        ) : null}
-                                    </li>
-                                );
-                            })}
-                        </ol>
-                        {pipeline.some((r) => r.status === 'failed') ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="mt-3"
-                                onClick={() =>
-                                    router.post(
-                                        `/documents/${document.id}/process`,
-                                    )
-                                }
-                            >
-                                Retry processing
+                            <RefreshIcon size={15} />
+                            Reprocess
+                        </Button>
+                        <a
+                            href={previewUrl}
+                            download
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Button variant="outline">
+                                <DownloadIcon size={15} />
+                                Download
                             </Button>
-                        ) : null}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Pages</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                        {pages.length === 0 ? (
-                            <p className="text-sm text-neutral-500">
-                                Not processed yet.
-                            </p>
-                        ) : (
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-neutral-200 text-left text-xs tracking-wide text-neutral-500 uppercase">
-                                        <th className="py-1.5 pr-3 font-medium">
-                                            Page
-                                        </th>
-                                        <th className="py-1.5 pr-3 font-medium">
-                                            Source
-                                        </th>
-                                        <th className="py-1.5 font-medium">
-                                            Confidence
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        </a>
+                        <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Button>
+                                <EyeIcon size={15} />
+                                Open document
+                            </Button>
+                        </a>
+                    </>
+                }
+            />
+
+            <div className="mb-5">
+                <StatusBadge status={document.status} />
+            </div>
+
+            <div className="grid items-start gap-4 lg:grid-cols-3">
+                {/* Main column */}
+                <div className="space-y-4 lg:col-span-2">
+                    {/* Preview */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Document preview</CardTitle>
+                            <CardDescription>
+                                Page-by-page OCR state — select a page to
+                                inspect its extraction source
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                            {pages.length === 0 ? (
+                                <div className="flex h-48 items-center justify-center rounded-md border border-dashed border-border-strong bg-elevated text-sm text-muted">
+                                    Pages appear once processing completes.
+                                </div>
+                            ) : (
+                                <ul className="grid gap-2 sm:grid-cols-2">
                                     {pages.map((page) => (
-                                        <tr
+                                        <li
                                             key={page.page_number}
-                                            className="border-b border-neutral-100"
+                                            id={`document-page-${page.page_number}`}
+                                            className="rounded-md border border-border bg-elevated p-3"
                                         >
-                                            <td className="py-1.5 pr-3 tabular-nums">
-                                                {page.page_number}
-                                            </td>
-                                            <td className="py-1.5 pr-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                                    <ScanIcon
+                                                        size={14}
+                                                        className="text-muted"
+                                                    />
+                                                    Page {page.page_number}
+                                                </span>
+                                                <span className="text-xs text-subtle tabular-nums">
+                                                    {page.ocr_confidence != null
+                                                        ? `${page.ocr_confidence}% OCR`
+                                                        : 'no score'}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-xs text-muted">
+                                                Source:{' '}
                                                 {page.text_source ?? '—'}
-                                            </td>
-                                            <td className="py-1.5 tabular-nums">
-                                                {page.ocr_confidence != null
-                                                    ? `${page.ocr_confidence}%`
-                                                    : '—'}
-                                            </td>
-                                        </tr>
+                                                {' · '}
+                                                {page.processing_status}
+                                            </p>
+                                            {page.error ? (
+                                                <p
+                                                    className="mt-1 truncate text-xs text-danger"
+                                                    title={page.error}
+                                                >
+                                                    {page.error}
+                                                </p>
+                                            ) : null}
+                                        </li>
                                     ))}
-                                </tbody>
-                            </table>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>AI Extraction</CardTitle>
-                        {extraction ? (
-                            <p className="mt-0.5 text-xs text-neutral-500">
-                                {extraction.schema_name} schema v
-                                {extraction.schema_version} · run v
-                                {extraction.version}
-                                {extraction.ai_run?.model
-                                    ? ` · ${extraction.ai_run.provider}/${extraction.ai_run.model}`
-                                    : ''}
-                            </p>
-                        ) : null}
-                    </CardHeader>
-                    <CardContent className="p-4">
-                        {extraction === null ? (
-                            <p className="text-sm text-neutral-500">
-                                No extraction yet — it runs automatically after
-                                classification.
-                            </p>
-                        ) : extraction.status === 'failed' ? (
-                            <div className="text-sm">
-                                <Badge variant="red">Extraction failed</Badge>
-                                {extraction.error ? (
-                                    <p className="mt-2 text-xs text-red-600">
-                                        {extraction.error}
-                                    </p>
+                                </ul>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* AI Analysis workspace */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <CardTitle>AI analysis</CardTitle>
+                                {extraction?.ai_run?.model ? (
+                                    <Badge variant="purple">
+                                        <AiIcon size={12} />
+                                        {extraction.ai_run.provider}
+                                        {extraction.ai_run.model
+                                            ? ` · ${extraction.ai_run.model}`
+                                            : ''}
+                                    </Badge>
                                 ) : null}
                             </div>
-                        ) : extraction.status === 'running' ? (
-                            <p className="animate-pulse text-sm text-blue-600">
-                                Extracting financial data…
-                            </p>
-                        ) : (
-                            <div>
-                                <div className="mb-3 flex items-center gap-2">
-                                    <span className="text-xs text-neutral-500">
-                                        Overall confidence
-                                    </span>
-                                    <Badge
-                                        variant={
-                                            confidenceVariant(
-                                                extraction.confidence,
-                                            ).variant
-                                        }
-                                    >
-                                        {
-                                            confidenceVariant(
-                                                extraction.confidence,
-                                            ).label
-                                        }
+                            {extraction ? (
+                                <CardDescription>
+                                    {extraction.schema_name} schema v
+                                    {extraction.schema_version} · run v
+                                    {extraction.version}
+                                    {extraction.ai_run?.prompt_version
+                                        ? ` · prompt v${extraction.ai_run.prompt_version}`
+                                        : ''}
+                                </CardDescription>
+                            ) : null}
+                        </CardHeader>
+                        <CardContent className="p-4">
+                            {extraction === null ? (
+                                <p className="flex items-center gap-2 text-sm text-muted">
+                                    <ClockIcon size={15} />
+                                    No extraction yet — it runs automatically
+                                    after classification.
+                                </p>
+                            ) : extraction.status === 'failed' ? (
+                                <div className="text-sm">
+                                    <Badge variant="red">
+                                        <AlertCircleIcon size={12} />
+                                        Extraction failed
                                     </Badge>
+                                    {extraction.error ? (
+                                        <p className="mt-2 text-xs text-danger">
+                                            {extraction.error}
+                                        </p>
+                                    ) : null}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-3"
+                                        onClick={retryProcessing}
+                                    >
+                                        <RefreshIcon size={14} />
+                                        Retry processing
+                                    </Button>
                                 </div>
-                                {extraction.fields.length === 0 ? (
-                                    <p className="text-sm text-neutral-500">
-                                        No fields extracted.
-                                    </p>
-                                ) : (
-                                    <ul className="divide-y divide-neutral-100">
-                                        {extraction.fields.map((field) => {
-                                            const badge = confidenceVariant(
-                                                field.confidence,
-                                            );
-                                            const hasEvidence =
-                                                field.evidence?.page != null ||
-                                                field.evidence?.source_text;
+                            ) : extraction.status === 'running' ? (
+                                <p className="flex items-center gap-2 text-sm text-info">
+                                    <RefreshIcon
+                                        size={15}
+                                        className="animate-spin"
+                                    />
+                                    Extracting financial data…
+                                </p>
+                            ) : findings ? (
+                                <div>
+                                    {/* Overall confidence */}
+                                    <div className="mb-5 rounded-md border border-border bg-elevated p-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="text-xs font-medium text-muted">
+                                                Overall AI confidence
+                                            </span>
+                                            <span
+                                                className={`text-sm font-semibold tabular-nums ${
+                                                    extraction.confidence ==
+                                                    null
+                                                        ? 'text-subtle'
+                                                        : confidenceColor(
+                                                                extraction.confidence,
+                                                            ) === 'success'
+                                                          ? 'text-success'
+                                                          : confidenceColor(
+                                                                  extraction.confidence,
+                                                              ) === 'warning'
+                                                            ? 'text-warning'
+                                                            : 'text-danger'
+                                                }`}
+                                            >
+                                                {confidenceLabel(
+                                                    extraction.confidence,
+                                                )}
+                                            </span>
+                                        </div>
+                                        <ConfidenceBar
+                                            value={extraction.confidence}
+                                            className="mt-2"
+                                        />
+                                        <p className="mt-1.5 text-xs text-subtle">
+                                            AI output is a recommendation —
+                                            verify the fields below before
+                                            approving.
+                                        </p>
+                                    </div>
 
-                                            return (
-                                                <li
-                                                    key={field.field}
-                                                    className="py-2 first:pt-0 last:pb-0"
-                                                >
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <span className="text-xs text-neutral-500">
-                                                            {FIELD_LABELS[
-                                                                field.field
-                                                            ] ??
-                                                                field.field.replaceAll(
-                                                                    '_',
-                                                                    ' ',
-                                                                )}
-                                                        </span>
-                                                        <Badge
-                                                            variant={
-                                                                badge.variant
-                                                            }
-                                                        >
-                                                            {badge.label}
-                                                        </Badge>
-                                                    </div>
-                                                    <p
-                                                        className={
-                                                            field.value
-                                                                ? 'mt-0.5 text-sm font-medium text-neutral-900'
-                                                                : 'mt-0.5 text-sm text-neutral-400'
-                                                        }
-                                                    >
-                                                        {field.value ||
-                                                            'not found'}
-                                                    </p>
-                                                    {hasEvidence ? (
-                                                        <button
-                                                            type="button"
-                                                            className="mt-1 text-left text-xs text-blue-700 hover:underline"
-                                                            title={
-                                                                field.evidence
-                                                                    ?.source_text ??
-                                                                undefined
-                                                            }
-                                                            onClick={() =>
-                                                                jumpToEvidence(
-                                                                    field
-                                                                        .evidence
-                                                                        ?.page,
-                                                                )
-                                                            }
-                                                        >
-                                                            {field.evidence
-                                                                ?.page != null
-                                                                ? `Show on page ${field.evidence.page}`
-                                                                : 'Show source'}
-                                                        </button>
-                                                    ) : null}
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Validation</CardTitle>
-                        {validation ? (
-                            <p className="mt-0.5 text-xs text-neutral-500">
-                                {validation.result === 'passed'
-                                    ? 'All checks passed'
-                                    : `${validation.summary?.anomaly_count ?? 0} finding(s)`}{' '}
-                                · engine v{validation.engine_version} · run v
-                                {validation.version}
-                            </p>
-                        ) : null}
-                    </CardHeader>
-                    <CardContent className="p-4">
-                        {validation === null ? (
-                            <p className="text-sm text-neutral-500">
-                                {extraction?.status === 'completed'
-                                    ? 'Validation queued…'
-                                    : 'Runs automatically after extraction.'}
-                            </p>
-                        ) : (
-                            <div>
-                                <div className="mb-3 flex items-center gap-2">
+                                    {extraction.fields.length === 0 ? (
+                                        <p className="text-sm text-muted">
+                                            No fields extracted.
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-5">
+                                            <FindingGroup
+                                                title="Confirmed by AI"
+                                                description="High confidence — still verify before approving"
+                                                variant="green"
+                                                icon={
+                                                    <CheckCircleIcon
+                                                        size={14}
+                                                    />
+                                                }
+                                                fields={findings.confirmed}
+                                                onEvidence={jumpToEvidence}
+                                            />
+                                            <FindingGroup
+                                                title="Needs review"
+                                                description="Medium confidence — a human must verify these"
+                                                variant="amber"
+                                                icon={<ClockIcon size={14} />}
+                                                fields={findings.needsReview}
+                                                onEvidence={jumpToEvidence}
+                                            />
+                                            <FindingGroup
+                                                title="Low confidence"
+                                                description="The AI is unsure — treat as unverified"
+                                                variant="red"
+                                                icon={
+                                                    <AlertCircleIcon
+                                                        size={14}
+                                                    />
+                                                }
+                                                fields={findings.low}
+                                                onEvidence={jumpToEvidence}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+
+                    {/* Validation */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <CardTitle>Validation</CardTitle>
+                                {validation ? (
                                     <Badge
                                         variant={
                                             validation.result === 'passed'
@@ -672,235 +620,411 @@ export default function DocumentShow({
                                                 : 'amber'
                                         }
                                     >
-                                        {validation.result}
+                                        {validation.result === 'passed' ? (
+                                            <CheckCircleIcon size={12} />
+                                        ) : (
+                                            <AlertCircleIcon size={12} />
+                                        )}
+                                        {validation.result === 'passed'
+                                            ? 'All checks passed'
+                                            : `${validation.summary?.anomaly_count ?? 0} finding${
+                                                  (validation.summary
+                                                      ?.anomaly_count ?? 0) ===
+                                                  1
+                                                      ? ''
+                                                      : 's'
+                                              }`}
                                     </Badge>
-                                    {validation.duration_ms != null ? (
-                                        <span className="text-xs text-neutral-400 tabular-nums">
-                                            {(
-                                                validation.duration_ms / 1000
-                                            ).toFixed(1)}
-                                            s
-                                        </span>
-                                    ) : null}
-                                </div>
-                                {validation.anomalies.length === 0 ? (
-                                    <p className="text-sm text-neutral-500">
-                                        No anomalies detected.
-                                    </p>
-                                ) : (
-                                    <ul className="space-y-2">
-                                        {validation.anomalies.map((anomaly) => (
-                                            <li
-                                                key={anomaly.id}
-                                                className="rounded-md border border-neutral-200 p-2.5"
-                                            >
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span className="text-sm font-medium text-neutral-900">
-                                                        {anomaly.title}
-                                                    </span>
-                                                    <span className="flex items-center gap-1.5">
-                                                        <Badge
-                                                            variant={
-                                                                SEVERITY_VARIANTS[
-                                                                    anomaly
-                                                                        .severity
-                                                                ] ?? 'neutral'
-                                                            }
-                                                        >
-                                                            {anomaly.severity}
-                                                        </Badge>
-                                                        <Badge
-                                                            variant={
-                                                                anomaly.status ===
-                                                                'open'
-                                                                    ? 'amber'
-                                                                    : 'green'
-                                                            }
-                                                        >
-                                                            {anomaly.status}
-                                                        </Badge>
-                                                    </span>
-                                                </div>
-                                                {anomaly.detail ? (
-                                                    <p className="mt-1 text-xs text-neutral-600">
-                                                        {anomaly.detail}
-                                                    </p>
-                                                ) : null}
-                                                <p className="mt-1 text-[11px] tracking-wide text-neutral-400 uppercase">
-                                                    {anomaly.type.replaceAll(
-                                                        '_',
-                                                        ' ',
-                                                    )}
-                                                </p>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                                ) : null}
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Review</CardTitle>
-                        <p className="mt-0.5 text-xs text-neutral-500">
-                            {reviews.length} decision
-                            {reviews.length === 1 ? '' : 's'} recorded
-                        </p>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                        {reviews.length > 0 ? (
-                            <ul className="mb-4 space-y-2">
-                                {reviews.map((review) => (
-                                    <li
-                                        key={review.id}
-                                        className="rounded-md border border-neutral-200 p-2.5 text-sm"
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <Badge
-                                                variant={
-                                                    DECISION_VARIANTS[
-                                                        review.decision
-                                                    ] ?? 'neutral'
-                                                }
-                                            >
-                                                {review.decision.replaceAll(
+                            {validation ? (
+                                <CardDescription>
+                                    Engine v{validation.engine_version} · run v
+                                    {validation.version}
+                                    {validation.duration_ms != null
+                                        ? ` · ${(validation.duration_ms / 1000).toFixed(1)}s`
+                                        : ''}
+                                </CardDescription>
+                            ) : null}
+                        </CardHeader>
+                        <CardContent className="p-4">
+                            {validation === null ? (
+                                <p className="text-sm text-muted">
+                                    {extraction?.status === 'completed'
+                                        ? 'Validation queued…'
+                                        : 'Runs automatically after extraction.'}
+                                </p>
+                            ) : validation.anomalies.length === 0 ? (
+                                <p className="flex items-center gap-2 text-sm text-success">
+                                    <CheckCircleIcon size={15} />
+                                    No anomalies detected — every rule passed.
+                                </p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {validation.anomalies.map((anomaly) => (
+                                        <li
+                                            key={anomaly.id}
+                                            className="rounded-md border border-border p-3"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <span className="text-sm font-medium text-foreground">
+                                                    {anomaly.title}
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <Badge
+                                                        variant={
+                                                            SEVERITY_VARIANTS[
+                                                                anomaly.severity
+                                                            ] ?? 'neutral'
+                                                        }
+                                                    >
+                                                        {anomaly.severity}
+                                                    </Badge>
+                                                    <Badge
+                                                        variant={
+                                                            anomaly.status ===
+                                                            'open'
+                                                                ? 'amber'
+                                                                : 'green'
+                                                        }
+                                                    >
+                                                        {anomaly.status}
+                                                    </Badge>
+                                                </span>
+                                            </div>
+                                            {anomaly.detail ? (
+                                                <p className="mt-1 text-xs text-muted">
+                                                    {anomaly.detail}
+                                                </p>
+                                            ) : null}
+                                            <p className="mt-1.5 text-[11px] font-medium tracking-wide text-subtle uppercase">
+                                                {anomaly.type.replaceAll(
                                                     '_',
                                                     ' ',
                                                 )}
-                                            </Badge>
-                                            <span className="text-xs text-neutral-400">
-                                                {new Date(
-                                                    review.created_at,
-                                                ).toLocaleString()}
+                                            </p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Side column */}
+                <div className="space-y-4">
+                    {/* Summary */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4 py-2">
+                            <FieldRow
+                                label="Type"
+                                value={
+                                    document.document_type?.name ??
+                                    'Unclassified'
+                                }
+                            />
+                            <FieldRow
+                                label="OPD"
+                                value={document.opd?.name ?? '—'}
+                            />
+                            <FieldRow
+                                label="Fiscal year"
+                                value={document.fiscal_year?.toString() ?? '—'}
+                            />
+                            <FieldRow
+                                label="Document number"
+                                value={document.document_number ?? '—'}
+                            />
+                            <FieldRow
+                                label="Pages"
+                                value={document.page_count?.toString() ?? '—'}
+                            />
+                            <FieldRow
+                                label="Size"
+                                value={document.file_size_human}
+                            />
+                            <FieldRow
+                                label="Uploaded by"
+                                value={document.uploader?.name ?? '—'}
+                            />
+                            <FieldRow
+                                label="Uploaded at"
+                                value={new Date(
+                                    document.created_at,
+                                ).toLocaleString('id-ID')}
+                            />
+                        </CardContent>
+                    </Card>
+
+                    {/* Pipeline */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Processing pipeline</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                            <ol className="space-y-2.5">
+                                {STAGE_ORDER.map((stage) => {
+                                    const run = [...pipeline]
+                                        .reverse()
+                                        .find((r) => r.stage === stage);
+
+                                    const state = !run
+                                        ? 'pending'
+                                        : run.status === 'completed'
+                                          ? 'done'
+                                          : run.status === 'failed'
+                                            ? 'failed'
+                                            : 'running';
+
+                                    return (
+                                        <li
+                                            key={stage}
+                                            className="flex items-center justify-between gap-2 text-sm"
+                                        >
+                                            <span className="flex min-w-0 items-center gap-2.5">
+                                                <span
+                                                    className={
+                                                        state === 'done'
+                                                            ? 'text-success'
+                                                            : state === 'failed'
+                                                              ? 'text-danger'
+                                                              : state ===
+                                                                  'running'
+                                                                ? 'animate-pulse text-info'
+                                                                : 'text-border-strong'
+                                                    }
+                                                >
+                                                    {state === 'done' ? (
+                                                        <CheckCircleIcon
+                                                            size={15}
+                                                        />
+                                                    ) : state === 'failed' ? (
+                                                        <AlertCircleIcon
+                                                            size={15}
+                                                        />
+                                                    ) : state === 'running' ? (
+                                                        <RefreshIcon
+                                                            size={15}
+                                                            className="animate-spin"
+                                                        />
+                                                    ) : (
+                                                        <ClockIcon size={15} />
+                                                    )}
+                                                </span>
+                                                <span
+                                                    className={
+                                                        state === 'pending'
+                                                            ? 'text-subtle'
+                                                            : 'text-foreground'
+                                                    }
+                                                >
+                                                    {STAGE_LABELS[stage] ??
+                                                        stage}
+                                                </span>
                                             </span>
-                                        </div>
-                                        {review.reviewer?.name ? (
-                                            <p className="mt-1 text-xs text-neutral-500">
-                                                by {review.reviewer.name}
-                                            </p>
-                                        ) : null}
-                                        {review.notes ? (
-                                            <p className="mt-1 text-xs text-neutral-700">
-                                                {review.notes}
-                                            </p>
-                                        ) : null}
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : null}
-                        {auth.can.review ? (
-                            <div className="space-y-3">
-                                <div>
-                                    <Label htmlFor="review-notes">
-                                        Review notes
-                                    </Label>
-                                    <textarea
-                                        id="review-notes"
-                                        className="min-h-16 w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                                        placeholder="Why this decision? (optional)"
-                                        value={reviewForm.data.notes}
-                                        onChange={(e) =>
-                                            reviewForm.setData(
-                                                'notes',
-                                                e.target.value,
-                                            )
-                                        }
+                                            {run?.error ? (
+                                                <span
+                                                    className="max-w-[45%] truncate text-xs text-danger"
+                                                    title={run.error}
+                                                >
+                                                    {run.error}
+                                                </span>
+                                            ) : run &&
+                                              run.duration_ms != null ? (
+                                                <span className="text-xs text-subtle tabular-nums">
+                                                    {(
+                                                        run.duration_ms / 1000
+                                                    ).toFixed(1)}
+                                                    s
+                                                </span>
+                                            ) : null}
+                                        </li>
+                                    );
+                                })}
+                            </ol>
+                            {failedStage ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-3"
+                                    onClick={retryProcessing}
+                                >
+                                    <RefreshIcon size={14} />
+                                    Retry processing
+                                </Button>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+
+                    {/* Review */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Human review</CardTitle>
+                            <CardDescription>
+                                {reviews.length} decision
+                                {reviews.length === 1 ? '' : 's'} recorded
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                            {reviews.length > 0 ? (
+                                <ul className="mb-4 space-y-2">
+                                    {reviews.map((review) => (
+                                        <li
+                                            key={review.id}
+                                            className="rounded-md border border-border p-2.5 text-sm"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <Badge
+                                                    variant={
+                                                        DECISION_VARIANTS[
+                                                            review.decision
+                                                        ] ?? 'neutral'
+                                                    }
+                                                >
+                                                    {review.decision.replaceAll(
+                                                        '_',
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                                <span className="text-xs text-subtle tabular-nums">
+                                                    {new Date(
+                                                        review.created_at,
+                                                    ).toLocaleString('id-ID')}
+                                                </span>
+                                            </div>
+                                            {review.reviewer?.name ? (
+                                                <p className="mt-1 text-xs text-muted">
+                                                    by {review.reviewer.name}
+                                                </p>
+                                            ) : null}
+                                            {review.notes ? (
+                                                <p className="mt-1 text-xs text-foreground">
+                                                    {review.notes}
+                                                </p>
+                                            ) : null}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
+
+                            {can.review ? (
+                                <form
+                                    onSubmit={(event: FormEvent) => {
+                                        event.preventDefault();
+                                    }}
+                                    className="space-y-3"
+                                >
+                                    <div>
+                                        <Label htmlFor="review-notes">
+                                            Review notes
+                                        </Label>
+                                        <Textarea
+                                            id="review-notes"
+                                            rows={3}
+                                            placeholder="Why this decision? (optional)"
+                                            value={reviewForm.data.notes}
+                                            onChange={(e) =>
+                                                reviewForm.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            size="sm"
+                                            disabled={reviewForm.processing}
+                                            onClick={() =>
+                                                submitReview('approved')
+                                            }
+                                        >
+                                            <CheckCircleIcon size={14} />
+                                            Approve
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="danger"
+                                            disabled={reviewForm.processing}
+                                            onClick={() =>
+                                                submitReview('rejected')
+                                            }
+                                        >
+                                            <AlertCircleIcon size={14} />
+                                            Reject
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={reviewForm.processing}
+                                            onClick={() =>
+                                                submitReview(
+                                                    'reanalysis_requested',
+                                                )
+                                            }
+                                        >
+                                            <RefreshIcon size={14} />
+                                            Re-analyze
+                                        </Button>
+                                    </div>
+                                    {reviewForm.errors.decision ? (
+                                        <p className="text-xs text-danger">
+                                            {reviewForm.errors.decision}
+                                        </p>
+                                    ) : null}
+                                </form>
+                            ) : (
+                                <p className="flex items-start gap-2 text-sm text-muted">
+                                    <InfoIcon
+                                        size={15}
+                                        className="mt-0.5 shrink-0"
                                     />
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        size="sm"
-                                        disabled={reviewForm.processing}
-                                        onClick={() => submitReview('approved')}
-                                    >
-                                        Approve
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="danger"
-                                        disabled={reviewForm.processing}
-                                        onClick={() => submitReview('rejected')}
-                                    >
-                                        Reject
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={reviewForm.processing}
-                                        onClick={() =>
-                                            submitReview('reanalysis_requested')
-                                        }
-                                    >
-                                        Request re-analysis
-                                    </Button>
-                                </div>
-                                {reviewForm.errors.decision ? (
-                                    <p className="text-xs text-red-600">
-                                        {reviewForm.errors.decision}
-                                    </p>
-                                ) : null}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-neutral-500">
-                                Verifier role required to review.
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>SIHANDAL</CardTitle>
-                        <p className="mt-0.5 text-xs text-neutral-500">
-                            Match candidates from the system of record
-                            (confidence-ordered). Confirming a candidate on an
+                                    Verifier role required to review.
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            {/* SIHANDAL integration */}
+            <Card className="mt-4">
+                <CardHeader>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <CardTitle>SIHANDAL matching</CardTitle>
+                        <CardDescription className="mt-0">
+                            Match candidates from the system of record,
+                            confidence-ordered. Confirming a candidate on an
                             approved document syncs it through the API — the
                             only write path to SIHANDAL.
-                        </p>
-                    </CardHeader>
-                    <CardContent className="space-y-4 p-4">
-                        {sihandal.matches.length > 0 ? (
+                        </CardDescription>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-6 p-4">
+                    <section>
+                        <SectionTitle
+                            title="Match candidates"
+                            description="AI-extracted data matched against SIHANDAL records"
+                        />
+                        {sihandal.matches.length === 0 ? (
+                            <p className="flex items-center gap-2 rounded-md border border-dashed border-border-strong bg-elevated px-4 py-6 text-sm text-muted">
+                                <InfoIcon size={15} />
+                                No SIHANDAL match candidates yet. Candidates
+                                appear once validation completes and SIHANDAL
+                                returns possible matches for the extracted data.
+                            </p>
+                        ) : (
                             <ul className="space-y-2">
                                 {sihandal.matches.map((match) => (
                                     <li
                                         key={match.id}
-                                        className="rounded-md border border-neutral-200 p-2.5 text-sm"
+                                        className="rounded-md border border-border p-3 text-sm"
                                     >
                                         <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Badge
-                                                    variant={
-                                                        confidenceVariant(
-                                                            match.confidence,
-                                                        ).variant
-                                                    }
-                                                >
-                                                    {match.confidence}% match
-                                                </Badge>
-                                                <span className="font-medium text-neutral-900">
-                                                    {String(
-                                                        match.sihandal_data
-                                                            .uraian ??
-                                                            match.entity_type,
-                                                    )}
-                                                </span>
-                                                <span className="text-xs text-neutral-500">
-                                                    {String(
-                                                        match.sihandal_data
-                                                            .rekening ??
-                                                            match.entity_id,
-                                                    )}
-                                                    {match.sihandal_data
-                                                        .amount !== undefined
-                                                        ? ` · Rp ${Number(
-                                                              match
-                                                                  .sihandal_data
-                                                                  .amount,
-                                                          ).toLocaleString()}`
-                                                        : ''}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex min-w-0 flex-wrap items-center gap-2">
                                                 <Badge
                                                     variant={
                                                         MATCH_STATUS_VARIANTS[
@@ -908,9 +1032,35 @@ export default function DocumentShow({
                                                         ] ?? 'neutral'
                                                     }
                                                 >
-                                                    {match.status}
+                                                    {match.confidence}% match
                                                 </Badge>
-                                                {auth.can.review &&
+                                                <span className="truncate font-medium text-foreground">
+                                                    {String(
+                                                        match.sihandal_data
+                                                            .uraian ??
+                                                            match.entity_type,
+                                                    )}
+                                                </span>
+                                                <span className="text-xs text-muted">
+                                                    {String(
+                                                        match.sihandal_data
+                                                            .rekening ??
+                                                            match.entity_id,
+                                                    )}
+                                                    {match.sihandal_data
+                                                        .amount != null
+                                                        ? ` · ${formatRupiah(
+                                                              match
+                                                                  .sihandal_data
+                                                                  .amount as
+                                                                  | string
+                                                                  | number,
+                                                          )}`
+                                                        : ''}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {can.review &&
                                                 document.status ===
                                                     'approved' &&
                                                 match.status === 'pending' ? (
@@ -924,6 +1074,9 @@ export default function DocumentShow({
                                                                 )
                                                             }
                                                         >
+                                                            <CheckCircleIcon
+                                                                size={14}
+                                                            />
                                                             Confirm &amp; sync
                                                         </Button>
                                                         <Button
@@ -939,19 +1092,38 @@ export default function DocumentShow({
                                                             Reject
                                                         </Button>
                                                     </div>
-                                                ) : null}
+                                                ) : (
+                                                    <Badge
+                                                        variant={
+                                                            MATCH_STATUS_VARIANTS[
+                                                                match.status
+                                                            ] ?? 'neutral'
+                                                        }
+                                                    >
+                                                        {match.status}
+                                                    </Badge>
+                                                )}
                                             </div>
                                         </div>
-                                        <p className="mt-1 text-xs text-neutral-500">
+                                        <p className="mt-1.5 text-xs text-subtle">
                                             v{match.version} · entity{' '}
                                             {match.entity_type}/
                                             {match.entity_id}
                                             {match.confirmed_by?.name
-                                                ? ` · ${match.status === 'rejected' ? 'rejected' : 'confirmed'} by ${match.confirmed_by.name}${
+                                                ? ` · ${
+                                                      match.status ===
+                                                      'rejected'
+                                                          ? 'rejected'
+                                                          : 'confirmed'
+                                                  } by ${
+                                                      match.confirmed_by.name
+                                                  }${
                                                       match.confirmed_at
                                                           ? ` on ${new Date(
                                                                 match.confirmed_at,
-                                                            ).toLocaleString()}`
+                                                            ).toLocaleString(
+                                                                'id-ID',
+                                                            )}`
                                                           : ''
                                                   }`
                                                 : ''}
@@ -959,27 +1131,52 @@ export default function DocumentShow({
                                     </li>
                                 ))}
                             </ul>
-                        ) : (
-                            <p className="text-sm text-neutral-500">
-                                No SIHANDAL match candidates yet. Candidates
-                                appear once validation completes and SIHANDAL
-                                returns possible matches for the extracted data.
-                            </p>
                         )}
+                    </section>
 
-                        {sihandal.syncs.length > 0 ? (
-                            <div>
-                                <h3 className="mb-2 text-sm font-semibold text-neutral-900">
-                                    Sync history
-                                </h3>
-                                <ul className="space-y-2">
-                                    {sihandal.syncs.map((sync) => (
-                                        <li
-                                            key={sync.id}
-                                            className="rounded-md border border-neutral-200 p-2.5 text-sm"
-                                        >
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <div className="flex flex-wrap items-center gap-2">
+                    <section>
+                        <SectionTitle
+                            title="Sync history"
+                            description="Every write to SIHANDAL, with its outcome"
+                        />
+                        {sihandal.syncs.length === 0 ? (
+                            <p className="text-sm text-muted">
+                                No syncs yet — confirmed candidates on approved
+                                documents are pushed to SIHANDAL and recorded
+                                here.
+                            </p>
+                        ) : (
+                            <div className="scroll-thin overflow-x-auto">
+                                <table className="w-full min-w-[640px] text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                            <th className="py-2 pr-4 font-medium">
+                                                Status
+                                            </th>
+                                            <th className="py-2 pr-4 font-medium">
+                                                Request
+                                            </th>
+                                            <th className="hidden py-2 pr-4 font-medium sm:table-cell">
+                                                HTTP
+                                            </th>
+                                            <th className="hidden py-2 pr-4 font-medium md:table-cell">
+                                                By
+                                            </th>
+                                            <th className="hidden py-2 pr-4 font-medium lg:table-cell">
+                                                Attempts
+                                            </th>
+                                            <th className="py-2 font-medium">
+                                                When
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sihandal.syncs.map((sync) => (
+                                            <tr
+                                                key={sync.id}
+                                                className="border-b border-border last:border-0"
+                                            >
+                                                <td className="py-2 pr-4">
                                                     <Badge
                                                         variant={
                                                             SYNC_STATUS_VARIANTS[
@@ -989,76 +1186,215 @@ export default function DocumentShow({
                                                     >
                                                         {sync.status}
                                                     </Badge>
-                                                    <span className="font-mono text-xs text-neutral-700">
+                                                </td>
+                                                <td className="py-2 pr-4">
+                                                    <span className="font-mono text-xs text-foreground">
                                                         {sync.method}{' '}
                                                         {sync.endpoint}
                                                     </span>
-                                                    {sync.http_status !==
-                                                    null ? (
-                                                        <span className="text-xs text-neutral-500">
-                                                            HTTP{' '}
-                                                            {sync.http_status}
-                                                        </span>
+                                                    {sync.error ? (
+                                                        <p
+                                                            className="mt-0.5 truncate text-xs text-danger"
+                                                            title={sync.error}
+                                                        >
+                                                            {sync.error}
+                                                        </p>
                                                     ) : null}
-                                                    <span className="text-xs text-neutral-500">
-                                                        attempt {sync.attempts}
-                                                    </span>
-                                                </div>
-                                                {auth.can.review &&
-                                                (sync.status === 'pending' ||
-                                                    sync.status ===
-                                                        'failed') ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={syncBusy}
-                                                        onClick={() =>
-                                                            retrySync(sync.id)
-                                                        }
-                                                    >
-                                                        Retry
-                                                    </Button>
-                                                ) : null}
-                                            </div>
-                                            <p className="mt-1 text-xs text-neutral-500">
-                                                {sync.user?.name
-                                                    ? `by ${sync.user.name} · `
-                                                    : ''}
-                                                {new Date(
-                                                    sync.created_at,
-                                                ).toLocaleString()}
-                                                {sync.error
-                                                    ? ` · ${sync.error}`
-                                                    : ''}
-                                            </p>
-                                        </li>
-                                    ))}
-                                </ul>
+                                                </td>
+                                                <td className="hidden py-2 pr-4 text-muted tabular-nums sm:table-cell">
+                                                    {sync.http_status ?? '—'}
+                                                </td>
+                                                <td className="hidden py-2 pr-4 text-muted md:table-cell">
+                                                    {sync.user?.name ?? '—'}
+                                                </td>
+                                                <td className="hidden py-2 pr-4 text-muted tabular-nums lg:table-cell">
+                                                    {sync.attempts}
+                                                </td>
+                                                <td className="py-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-subtle tabular-nums">
+                                                            {new Date(
+                                                                sync.created_at,
+                                                            ).toLocaleString(
+                                                                'id-ID',
+                                                            )}
+                                                        </span>
+                                                        {can.review &&
+                                                        (sync.status ===
+                                                            'pending' ||
+                                                            sync.status ===
+                                                                'failed') ? (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                disabled={
+                                                                    syncBusy
+                                                                }
+                                                                onClick={() =>
+                                                                    retrySync(
+                                                                        sync.id,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <RefreshIcon
+                                                                    size={13}
+                                                                />
+                                                                Retry
+                                                            </Button>
+                                                        ) : null}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        ) : null}
-                    </CardContent>
-                </Card>
-            </div>
+                        )}
+                    </section>
+                </CardContent>
+            </Card>
         </AppShell>
     );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+type BucketedFindings = {
+    confirmed: ExtractionField[];
+    needsReview: ExtractionField[];
+    low: ExtractionField[];
+};
+
+function bucketFindings(fields: ExtractionField[]): BucketedFindings {
+    const confirmed: ExtractionField[] = [];
+    const needsReview: ExtractionField[] = [];
+    const low: ExtractionField[] = [];
+
+    for (const field of fields) {
+        if (field.confidence == null) {
+            needsReview.push(field);
+        } else if (field.confidence >= 85) {
+            confirmed.push(field);
+        } else if (field.confidence >= 60) {
+            needsReview.push(field);
+        } else {
+            low.push(field);
+        }
+    }
+
+    return { confirmed, needsReview, low };
+}
+
+function FindingGroup({
+    title,
+    description,
+    variant,
+    icon,
+    fields,
+    onEvidence,
+}: {
+    title: string;
+    description: string;
+    variant: 'green' | 'amber' | 'red';
+    icon: React.ReactNode;
+    fields: ExtractionField[];
+    onEvidence: (page?: number) => void;
+}) {
+    if (fields.length === 0) {
+        return null;
+    }
+
     return (
-        <div className="flex items-start justify-between gap-4 border-b border-neutral-100 pb-1.5 last:border-0">
-            <span className="text-xs text-neutral-500">{label}</span>
-            <span className="text-right font-medium text-neutral-900">
-                {value}
-            </span>
-        </div>
+        <section>
+            <div
+                className={`mb-2 flex items-center gap-2 text-xs font-semibold ${
+                    variant === 'green'
+                        ? 'text-success'
+                        : variant === 'amber'
+                          ? 'text-warning'
+                          : 'text-danger'
+                }`}
+            >
+                {icon}
+                {title}
+                <span className="font-normal text-subtle">— {description}</span>
+            </div>
+            <ul className="divide-y divide-border rounded-md border border-border">
+                {fields.map((field) => {
+                    const hasEvidence =
+                        field.evidence?.page != null ||
+                        field.evidence?.source_text;
+
+                    return (
+                        <li
+                            key={field.field}
+                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5"
+                        >
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs text-muted">
+                                    {fieldLabel(field.field)}
+                                </p>
+                                <p
+                                    className={`mt-0.5 text-sm font-medium break-words ${
+                                        field.value
+                                            ? 'text-foreground'
+                                            : 'text-subtle'
+                                    }`}
+                                >
+                                    {field.value || 'not found'}
+                                </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <span
+                                    className="text-xs tabular-nums"
+                                    style={{
+                                        color:
+                                            field.confidence == null
+                                                ? undefined
+                                                : confidenceColor(
+                                                        field.confidence,
+                                                    ) === 'success'
+                                                  ? 'var(--success)'
+                                                  : confidenceColor(
+                                                          field.confidence,
+                                                      ) === 'warning'
+                                                    ? 'var(--warning)'
+                                                    : 'var(--danger)',
+                                    }}
+                                >
+                                    {confidenceLabel(field.confidence)}
+                                </span>
+                                <ConfidenceBar
+                                    value={field.confidence}
+                                    className="w-16"
+                                />
+                                {hasEvidence ? (
+                                    <button
+                                        type="button"
+                                        className="cursor-pointer text-xs font-medium text-brand hover:underline"
+                                        title={
+                                            field.evidence?.source_text ??
+                                            undefined
+                                        }
+                                        onClick={() =>
+                                            onEvidence(field.evidence?.page)
+                                        }
+                                    >
+                                        {field.evidence?.page != null
+                                            ? `Show on page ${field.evidence.page}`
+                                            : 'Show source'}
+                                    </button>
+                                ) : null}
+                            </div>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
     );
 }
 
 /**
- * Jump to the evidence location (spec §12): scrolls the preview pane and
- * highlights the target page. The full page-image viewer with bbox overlays
- * lands with the viewer work; until then the preview link + anchor gives the
- * reviewer a direct path to the cited page.
+ * Jump to the evidence location (spec §12): scrolls the page-state
+ * card and highlights the target page.
  */
 function jumpToEvidence(page?: number) {
     if (page == null) {
@@ -1069,9 +1405,9 @@ function jumpToEvidence(page?: number) {
 
     if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        target.classList.add('ring-2', 'ring-blue-500');
+        target.classList.add('ring-2', 'ring-brand');
         window.setTimeout(
-            () => target.classList.remove('ring-2', 'ring-blue-500'),
+            () => target.classList.remove('ring-2', 'ring-brand'),
             2000,
         );
     }

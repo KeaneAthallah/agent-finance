@@ -67,10 +67,8 @@ class SihandalController extends Controller
             'counts' => $counts,
             'pendingMatches' => $pendingMatches,
             'syncs' => $syncs,
-            'auth' => [
-                'can' => [
-                    'review' => $user->can('review', Document::class),
-                ],
+            'can' => [
+                'review' => $user->can('review', Document::class),
             ],
         ]);
     }

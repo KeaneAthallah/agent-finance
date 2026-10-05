@@ -3,9 +3,155 @@
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
+/* Class-based dark mode: the theme is applied by toggling .dark on
+   <html> (see lib/theme.ts and the pre-paint script in app.blade.php). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Semantic design tokens.
+ *
+ * @theme inline maps utility names (bg-surface, text-foreground, …)
+ * to plain CSS variables, so the same utilities re-resolve when the
+ * .dark scope swaps the variable values. Light and dark palettes are
+ * designed independently — dark is not an inversion.
+ */
+@theme inline {
+    --color-background: var(--background);
+    --color-surface: var(--surface);
+    --color-elevated: var(--elevated);
+    --color-border: var(--border);
+    --color-border-strong: var(--border-strong);
+    --color-foreground: var(--foreground);
+    --color-muted: var(--muted);
+    --color-subtle: var(--subtle);
+    --color-brand: var(--brand);
+    --color-brand-strong: var(--brand-strong);
+    --color-brand-subtle: var(--brand-subtle);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-success: var(--success);
+    --color-success-subtle: var(--success-subtle);
+    --color-warning: var(--warning);
+    --color-warning-subtle: var(--warning-subtle);
+    --color-danger: var(--danger);
+    --color-danger-subtle: var(--danger-subtle);
+    --color-info: var(--info);
+    --color-info-subtle: var(--info-subtle);
+    --color-purple: var(--purple);
+    --color-purple-subtle: var(--purple-subtle);
+}
+
 @theme {
     --font-sans:
         'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+}
+
+:root {
+    /* Surfaces — cool, near-white government platform feel */
+    --background: oklch(0.975 0.003 250);
+    --surface: oklch(1 0 0);
+    --elevated: oklch(0.985 0.002 250);
+
+    /* Lines */
+    --border: oklch(0.905 0.004 250);
+    --border-strong: oklch(0.83 0.006 250);
+
+    /* Text */
+    --foreground: oklch(0.2 0.012 250);
+    --muted: oklch(0.44 0.012 250);
+    --subtle: oklch(0.6 0.008 250);
+
+    /* Brand — trustworthy institutional blue */
+    --brand: oklch(0.46 0.155 256);
+    --brand-strong: oklch(0.38 0.16 256);
+    --brand-subtle: oklch(0.94 0.03 256);
+    --brand-foreground: oklch(1 0 0);
+
+    /* Semantic accents */
+    --success: oklch(0.42 0.14 158);
+    --success-subtle: oklch(0.94 0.035 158);
+    --warning: oklch(0.52 0.15 75);
+    --warning-subtle: oklch(0.94 0.04 75);
+    --danger: oklch(0.46 0.17 27);
+    --danger-subtle: oklch(0.94 0.03 27);
+    --info: oklch(0.46 0.14 220);
+    --info-subtle: oklch(0.94 0.03 220);
+    --purple: oklch(0.48 0.14 300);
+    --purple-subtle: oklch(0.94 0.03 300);
+
+    --ring: oklch(0.46 0.155 256 / 0.35);
+}
+
+.dark {
+    /* Surfaces — deep slate, intentionally designed for dark */
+    --background: oklch(0.155 0.008 250);
+    --surface: oklch(0.185 0.009 250);
+    --elevated: oklch(0.22 0.01 250);
+
+    /* Lines */
+    --border: oklch(0.27 0.01 250);
+    --border-strong: oklch(0.36 0.012 250);
+
+    /* Text */
+    --foreground: oklch(0.93 0.005 250);
+    --muted: oklch(0.72 0.008 250);
+    --subtle: oklch(0.55 0.008 250);
+
+    /* Brand — lighter blue for contrast on dark */
+    --brand: oklch(0.68 0.14 256);
+    --brand-strong: oklch(0.76 0.13 256);
+    --brand-subtle: oklch(0.26 0.05 256);
+    --brand-foreground: oklch(0.12 0.01 250);
+
+    /* Semantic accents — softened but distinguishable on dark */
+    --success: oklch(0.68 0.15 158);
+    --success-subtle: oklch(0.24 0.045 158);
+    --warning: oklch(0.72 0.15 75);
+    --warning-subtle: oklch(0.26 0.05 75);
+    --danger: oklch(0.68 0.16 27);
+    --danger-subtle: oklch(0.25 0.04 27);
+    --info: oklch(0.68 0.13 220);
+    --info-subtle: oklch(0.24 0.04 220);
+    --purple: oklch(0.7 0.13 300);
+    --purple-subtle: oklch(0.25 0.045 300);
+
+    --ring: oklch(0.68 0.14 256 / 0.45);
+}
+
+@layer base {
+    body {
+        @apply bg-background font-sans text-foreground antialiased;
+    }
+
+    ::selection {
+        @apply bg-brand-subtle text-foreground;
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+    }
+}
+
+@layer utilities {
+    /* Thin scrollbars that match the theme */
+    .scroll-thin {
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-strong) transparent;
+    }
+
+    .scroll-thin::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .scroll-thin::-webkit-scrollbar-thumb {
+        background: var(--border-strong);
+        border-radius: 999px;
+    }
+
+    .scroll-thin::-webkit-scrollbar-track {
+        background: transparent;
+    }
 }

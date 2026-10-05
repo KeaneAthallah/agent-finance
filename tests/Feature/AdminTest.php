@@ -35,7 +35,7 @@ it('renders the administration surface to admins only', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('admin/index')
-            ->where('auth.can.manage', false));
+            ->where('can.manage', false));
 
     // Super admins may mutate.
     actingAs(superAdminUser());
@@ -44,7 +44,7 @@ it('renders the administration surface to admins only', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('admin/index')
-            ->where('auth.can.manage', true));
+            ->where('can.manage', true));
 
     // Verifiers never see the platform surface.
     actingAs(testUser(UserRole::Verifier->value, testOpd()));

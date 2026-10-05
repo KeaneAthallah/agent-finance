@@ -1,6 +1,25 @@
 import { Head, Link } from '@inertiajs/react';
 import { AppShell } from '@/components/layout/app-shell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import AnomalyController from '@/actions/App/Http/Controllers/AnomalyController';
+import {
+    AlertCircleIcon,
+    CheckCircleIcon,
+    ClockIcon,
+    CpuIcon,
+    ReviewIcon,
+    SihandalIcon,
+    TrendUpIcon,
+} from '@/components/icons';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+    PageHeader,
+    ProgressBar,
+    StatCard,
+} from '@/components/ui';
 import type { InertiaPageProps } from '@/types';
 
 type Props = InertiaPageProps & {
@@ -37,25 +56,8 @@ type Props = InertiaPageProps & {
     }[];
 };
 
-const CONFIDENCE_BARS: Record<string, string> = {
-    green: 'bg-green-600',
-    amber: 'bg-amber-600',
-    red: 'bg-red-600',
-};
-
 function number(value: number): string {
     return new Intl.NumberFormat('id-ID').format(value);
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="rounded-md border border-neutral-200 p-3">
-            <div className="text-2xl font-semibold text-neutral-900">
-                {value}
-            </div>
-            <div className="text-xs font-medium text-neutral-500">{label}</div>
-        </div>
-    );
 }
 
 export default function ReportsIndex({
@@ -72,169 +74,234 @@ export default function ReportsIndex({
     const share = (part: number) =>
         confidenceTotal === 0 ? 0 : Math.round((part / confidenceTotal) * 100);
 
+    const fiscalYears = Object.entries(documents.by_fiscal_year).sort(
+        ([a], [b]) => (a < b ? -1 : 1),
+    );
+    const maxYearTotal = Math.max(1, ...fiscalYears.map(([, total]) => total));
+
+    const topTypes = Object.entries(documents.by_type)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 6);
+    const maxTypeTotal = Math.max(1, ...topTypes.map(([, t]) => t));
+
     return (
-        <AppShell title="Reports">
+        <AppShell
+            title="Reports"
+            subtitle={scope === 'opd' ? 'Scoped to your OPD' : 'Platform-wide'}
+        >
             <Head title="Reports" />
 
-            <p className="mb-4 max-w-3xl text-sm text-neutral-600">
-                Platform reports
-                {scope === 'opd'
-                    ? ' — scoped to your OPD (§36). Platform staff see every OPD.'
-                    : ' — every OPD, platform-wide.'}{' '}
-                Every figure is computed from real pipeline state.
-            </p>
+            <PageHeader
+                title="Reports"
+                description={
+                    scope === 'opd'
+                        ? 'Platform reports scoped to your OPD. Platform staff see every OPD. Every figure is computed from real pipeline state.'
+                        : 'Platform reports — every OPD, platform-wide. Every figure is computed from real pipeline state.'
+                }
+            />
 
-            <Card className="mb-4">
-                <CardHeader>
-                    <CardTitle>Documents processed</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                    <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                        <Stat
-                            label="Total documents"
-                            value={number(documents.total)}
-                        />
-                        <Stat
-                            label="Review required"
-                            value={number(
-                                documents.by_status.review_required ?? 0,
-                            )}
-                        />
-                        <Stat
-                            label="Approved"
-                            value={number(
-                                (documents.by_status.approved ?? 0) +
-                                    (documents.by_status.completed ?? 0),
-                            )}
-                        />
-                        <Stat
-                            label="Failed"
-                            value={number(
-                                (documents.by_status.processing_failed ?? 0) +
-                                    (documents.by_status.ocr_failed ?? 0) +
-                                    (documents.by_status.ai_failed ?? 0) +
-                                    (documents.by_status.validation_failed ??
-                                        0) +
-                                    (documents.by_status.sync_failed ?? 0),
-                            )}
-                        />
-                    </div>
+            {/* Document KPIs */}
+            <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <StatCard
+                    label="Total documents"
+                    value={number(documents.total)}
+                    variant="neutral"
+                    icon={<TrendUpIcon size={15} />}
+                />
+                <StatCard
+                    label="Review required"
+                    value={number(documents.by_status.review_required ?? 0)}
+                    hint="awaiting a human"
+                    variant="amber"
+                    icon={<ReviewIcon size={15} />}
+                />
+                <StatCard
+                    label="Approved"
+                    value={number(
+                        (documents.by_status.approved ?? 0) +
+                            (documents.by_status.completed ?? 0),
+                    )}
+                    hint="verified"
+                    variant="green"
+                    icon={<CheckCircleIcon size={15} />}
+                />
+                <StatCard
+                    label="Failed"
+                    value={number(
+                        (documents.by_status.processing_failed ?? 0) +
+                            (documents.by_status.ocr_failed ?? 0) +
+                            (documents.by_status.ai_failed ?? 0) +
+                            (documents.by_status.validation_failed ?? 0) +
+                            (documents.by_status.sync_failed ?? 0),
+                    )}
+                    hint="need attention"
+                    variant="red"
+                    icon={<AlertCircleIcon size={15} />}
+                />
+            </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <h3 className="mb-2 text-sm font-medium text-neutral-700">
-                                By fiscal year
-                            </h3>
-                            {Object.keys(documents.by_fiscal_year).length ===
-                            0 ? (
-                                <p className="text-sm text-neutral-500">
-                                    No documents yet.
-                                </p>
-                            ) : (
-                                <table className="w-full text-sm">
-                                    <tbody>
-                                        {Object.entries(
-                                            documents.by_fiscal_year,
-                                        ).map(([year, total]) => (
-                                            <tr
-                                                key={year}
-                                                className="border-b border-neutral-100"
-                                            >
-                                                <td className="py-1.5 font-medium text-neutral-900">
-                                                    {year}
-                                                </td>
-                                                <td className="py-1.5 text-right text-neutral-600">
-                                                    {number(total)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                        <div>
-                            <h3 className="mb-2 text-sm font-medium text-neutral-700">
-                                By document type (top 5)
-                            </h3>
-                            {Object.keys(documents.by_type).length === 0 ? (
-                                <p className="text-sm text-neutral-500">
-                                    No documents yet.
-                                </p>
-                            ) : (
-                                <table className="w-full text-sm">
-                                    <tbody>
-                                        {Object.entries(documents.by_type).map(
-                                            ([code, total]) => (
-                                                <tr
-                                                    key={code}
-                                                    className="border-b border-neutral-100"
-                                                >
-                                                    <td className="py-1.5 font-medium text-neutral-900 uppercase">
-                                                        {code}
-                                                    </td>
-                                                    <td className="py-1.5 text-right text-neutral-600">
-                                                        {number(total)}
-                                                    </td>
-                                                </tr>
-                                            ),
-                                        )}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <div className="mb-4 grid gap-4 md:grid-cols-2">
+            {/* Volume charts */}
+            <div className="mb-5 grid gap-4 lg:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Extraction confidence</CardTitle>
+                        <CardTitle>Documents by fiscal year</CardTitle>
                     </CardHeader>
                     <CardContent className="p-4">
-                        {confidenceTotal === 0 ? (
-                            <p className="text-sm text-neutral-500">
-                                No extraction fields scored yet.
+                        {fiscalYears.length === 0 ? (
+                            <p className="text-sm text-muted">
+                                No documents yet.
                             </p>
                         ) : (
-                            <div className="space-y-3">
-                                {[
-                                    {
-                                        label: 'High (≥ 85)',
-                                        count: confidence.high,
-                                        variant: 'green' as const,
-                                    },
-                                    {
-                                        label: 'Medium (60–84)',
-                                        count: confidence.medium,
-                                        variant: 'amber' as const,
-                                    },
-                                    {
-                                        label: 'Low (< 60)',
-                                        count: confidence.low,
-                                        variant: 'red' as const,
-                                    },
-                                ].map((bucket) => (
-                                    <div key={bucket.label}>
-                                        <div className="mb-1 flex justify-between text-sm">
-                                            <span className="font-medium text-neutral-700">
-                                                {bucket.label}
+                            <ul className="space-y-3">
+                                {fiscalYears.map(([year, total]) => (
+                                    <li key={year}>
+                                        <div className="mb-1 flex items-center justify-between text-sm">
+                                            <span className="font-medium text-foreground tabular-nums">
+                                                {year}
                                             </span>
-                                            <span className="text-neutral-500">
-                                                {number(bucket.count)} (
-                                                {share(bucket.count)}%)
+                                            <span className="text-muted tabular-nums">
+                                                {number(total)}
                                             </span>
                                         </div>
-                                        <div className="h-2 rounded-full bg-neutral-100">
+                                        <div className="h-2 overflow-hidden rounded-full bg-elevated">
                                             <div
-                                                className={`h-2 rounded-full ${CONFIDENCE_BARS[bucket.variant]}`}
+                                                className="h-full rounded-full bg-brand transition-[width]"
                                                 style={{
-                                                    width: `${share(bucket.count)}%`,
+                                                    width: `${Math.round(
+                                                        (total / maxYearTotal) *
+                                                            100,
+                                                    )}%`,
                                                 }}
                                             />
                                         </div>
-                                    </div>
+                                    </li>
                                 ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>
+                            By document type (top {topTypes.length})
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                        {topTypes.length === 0 ? (
+                            <p className="text-sm text-muted">
+                                No documents yet.
+                            </p>
+                        ) : (
+                            <ul className="space-y-3">
+                                {topTypes.map(([code, total]) => (
+                                    <li key={code}>
+                                        <div className="mb-1 flex items-center justify-between text-sm">
+                                            <span className="font-medium tracking-wide text-foreground uppercase">
+                                                {code}
+                                            </span>
+                                            <span className="text-muted tabular-nums">
+                                                {number(total)}
+                                            </span>
+                                        </div>
+                                        <div className="h-2 overflow-hidden rounded-full bg-elevated">
+                                            <div
+                                                className="h-full rounded-full bg-info transition-[width]"
+                                                style={{
+                                                    width: `${Math.round(
+                                                        (total / maxTypeTotal) *
+                                                            100,
+                                                    )}%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Confidence + workload */}
+            <div className="mb-5 grid gap-4 lg:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Extraction confidence</CardTitle>
+                        <CardDescription>
+                            Share of extracted fields by confidence bucket
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                        {confidenceTotal === 0 ? (
+                            <p className="text-sm text-muted">
+                                No extraction fields scored yet.
+                            </p>
+                        ) : (
+                            <div>
+                                {/* stacked distribution */}
+                                <div
+                                    className="mb-4 flex h-3 w-full overflow-hidden rounded-full"
+                                    role="img"
+                                    aria-label={`Confidence distribution: ${share(confidence.high)}% high, ${share(confidence.medium)}% medium, ${share(confidence.low)}% low`}
+                                >
+                                    <div
+                                        className="h-full bg-success transition-[width]"
+                                        style={{
+                                            width: `${share(confidence.high)}%`,
+                                        }}
+                                    />
+                                    <div
+                                        className="h-full bg-warning transition-[width]"
+                                        style={{
+                                            width: `${share(confidence.medium)}%`,
+                                        }}
+                                    />
+                                    <div
+                                        className="h-full bg-danger transition-[width]"
+                                        style={{
+                                            width: `${share(confidence.low)}%`,
+                                        }}
+                                    />
+                                </div>
+                                <ul className="space-y-3">
+                                    {[
+                                        {
+                                            label: 'High (≥ 85)',
+                                            count: confidence.high,
+                                            variant: 'success' as const,
+                                        },
+                                        {
+                                            label: 'Medium (60–84)',
+                                            count: confidence.medium,
+                                            variant: 'warning' as const,
+                                        },
+                                        {
+                                            label: 'Low (< 60)',
+                                            count: confidence.low,
+                                            variant: 'danger' as const,
+                                        },
+                                    ].map((bucket) => (
+                                        <li
+                                            key={bucket.label}
+                                            className="flex items-center gap-3"
+                                        >
+                                            <span className="w-28 text-sm font-medium text-muted">
+                                                {bucket.label}
+                                            </span>
+                                            <div className="flex-1">
+                                                <ProgressBar
+                                                    value={share(bucket.count)}
+                                                    variant={bucket.variant}
+                                                />
+                                            </div>
+                                            <span className="w-24 text-right text-sm text-muted tabular-nums">
+                                                {number(bucket.count)} (
+                                                {share(bucket.count)}%)
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
                         )}
                     </CardContent>
@@ -243,34 +310,44 @@ export default function ReportsIndex({
                 <Card>
                     <CardHeader>
                         <CardTitle>Review workload</CardTitle>
+                        <CardDescription>
+                            What needs a human right now
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="p-4">
                         <div className="grid grid-cols-2 gap-3">
-                            <Stat
+                            <StatCard
                                 label="Awaiting review"
                                 value={number(workload.review_required)}
+                                variant="amber"
+                                icon={<ReviewIcon size={15} />}
                             />
-                            <Stat
+                            <StatCard
                                 label="Open anomalies"
                                 value={number(workload.open_anomalies)}
+                                icon={<AlertCircleIcon size={15} />}
                             />
-                            <Stat
+                            <StatCard
                                 label="Critical / high"
                                 value={`${number(workload.critical_anomalies)} / ${number(workload.high_anomalies)}`}
+                                variant="red"
+                                icon={<AlertCircleIcon size={15} />}
                             />
-                            <Stat
+                            <StatCard
                                 label="SIHANDAL confirmations"
                                 value={number(
                                     workload.pending_sihandal_confirmations,
                                 )}
+                                variant="purple"
+                                icon={<SihandalIcon size={15} />}
                             />
                         </div>
-                        <p className="mt-3 text-xs text-neutral-500">
+                        <p className="mt-3 text-xs text-muted">
                             {number(workload.resolved_anomalies)} anomalies
                             resolved by reviewers.{' '}
                             <Link
-                                className="font-medium text-blue-700 hover:underline"
-                                href="/anomalies"
+                                className="font-medium text-brand hover:underline"
+                                href={AnomalyController.index.url()}
                             >
                                 Open the anomaly workspace
                             </Link>
@@ -279,82 +356,115 @@ export default function ReportsIndex({
                 </Card>
             </div>
 
-            <div className="mb-4 grid gap-4 md:grid-cols-2">
+            {/* Sync health + AI cost */}
+            <div className="mb-5 grid gap-4 lg:grid-cols-2">
                 <Card>
                     <CardHeader>
                         <CardTitle>SIHANDAL sync health</CardTitle>
+                        <CardDescription>
+                            Failed syncs are retryable — SIHANDAL being
+                            unavailable never loses a document.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="p-4">
-                        <div className="grid grid-cols-3 gap-3">
-                            <Stat
-                                label="Pending"
-                                value={number(syncHealth.pending)}
+                        <div className="mb-3 flex h-3 w-full overflow-hidden rounded-full bg-elevated">
+                            <div
+                                className="h-full bg-warning transition-[width]"
+                                style={{
+                                    width: `${syncHealth.pending + syncHealth.success + syncHealth.failed === 0 ? 0 : Math.round((syncHealth.pending / Math.max(1, syncHealth.pending + syncHealth.success + syncHealth.failed)) * 100)}%`,
+                                }}
                             />
-                            <Stat
-                                label="Succeeded"
-                                value={number(syncHealth.success)}
+                            <div
+                                className="h-full bg-success transition-[width]"
+                                style={{
+                                    width: `${syncHealth.pending + syncHealth.success + syncHealth.failed === 0 ? 0 : Math.round((syncHealth.success / Math.max(1, syncHealth.pending + syncHealth.success + syncHealth.failed)) * 100)}%`,
+                                }}
                             />
-                            <Stat
-                                label="Failed"
-                                value={number(syncHealth.failed)}
+                            <div
+                                className="h-full bg-danger transition-[width]"
+                                style={{
+                                    width: `${syncHealth.pending + syncHealth.success + syncHealth.failed === 0 ? 0 : Math.round((syncHealth.failed / Math.max(1, syncHealth.pending + syncHealth.success + syncHealth.failed)) * 100)}%`,
+                                }}
                             />
                         </div>
-                        <p className="mt-3 text-xs text-neutral-500">
-                            Failed syncs are retryable — SIHANDAL being
-                            unavailable never loses a document (§50).
-                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                            <StatCard
+                                label="Pending"
+                                value={number(syncHealth.pending)}
+                                variant="amber"
+                                icon={<ClockIcon size={15} />}
+                            />
+                            <StatCard
+                                label="Succeeded"
+                                value={number(syncHealth.success)}
+                                variant="green"
+                                icon={<CheckCircleIcon size={15} />}
+                            />
+                            <StatCard
+                                label="Failed"
+                                value={number(syncHealth.failed)}
+                                variant="red"
+                                icon={<AlertCircleIcon size={15} />}
+                            />
+                        </div>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
                         <CardTitle>AI token &amp; cost</CardTitle>
+                        <CardDescription>
+                            Extraction runs across all documents
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="p-4">
                         <div className="grid grid-cols-2 gap-3">
-                            <Stat
+                            <StatCard
                                 label="AI calls"
                                 value={number(aiCost.calls)}
+                                icon={<CpuIcon size={15} />}
                             />
-                            <Stat
+                            <StatCard
                                 label="Avg duration"
                                 value={`${number(Math.round(aiCost.avg_duration_ms / 100) / 10)}s`}
+                                icon={<ClockIcon size={15} />}
                             />
-                            <Stat
+                            <StatCard
                                 label="Input tokens"
                                 value={number(aiCost.input_tokens)}
                             />
-                            <Stat
+                            <StatCard
                                 label="Output tokens"
                                 value={number(aiCost.output_tokens)}
                             />
                         </div>
-                        <div className="mt-3 rounded-md border border-neutral-200 p-3">
-                            <div className="text-xs font-medium text-neutral-500">
+                        <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-elevated p-3">
+                            <span className="text-xs font-medium text-muted">
                                 Estimated cost
-                            </div>
-                            <div className="text-xl font-semibold text-neutral-900">
+                            </span>
+                            <span className="text-xl font-semibold text-foreground tabular-nums">
                                 {aiCost.cost_estimate}
-                            </div>
+                            </span>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
+            {/* Cost by model */}
             <Card>
                 <CardHeader>
                     <CardTitle>Cost by model</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
                     {aiCostByModel.length === 0 ? (
-                        <p className="text-sm text-neutral-500">
+                        <p className="text-sm text-muted">
                             No AI usage recorded yet.
                         </p>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                        <div className="scroll-thin overflow-x-auto">
+                            <table className="w-full min-w-[640px] text-sm">
                                 <thead>
-                                    <tr className="border-b border-neutral-200 text-left text-xs tracking-wide text-neutral-500 uppercase">
+                                    <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
                                         <th className="py-2 pr-4 font-medium">
                                             Model
                                         </th>
@@ -376,21 +486,21 @@ export default function ReportsIndex({
                                     {aiCostByModel.map((row) => (
                                         <tr
                                             key={row.model}
-                                            className="border-b border-neutral-100"
+                                            className="border-b border-border last:border-0"
                                         >
-                                            <td className="py-2 pr-4 font-medium text-neutral-900">
+                                            <td className="py-2 pr-4 font-medium text-foreground">
                                                 {row.model}
                                             </td>
-                                            <td className="py-2 pr-4 text-neutral-600">
+                                            <td className="py-2 pr-4 text-muted tabular-nums">
                                                 {number(row.calls)}
                                             </td>
-                                            <td className="py-2 pr-4 text-neutral-600">
+                                            <td className="py-2 pr-4 text-muted tabular-nums">
                                                 {number(row.input_tokens)}
                                             </td>
-                                            <td className="py-2 pr-4 text-neutral-600">
+                                            <td className="py-2 pr-4 text-muted tabular-nums">
                                                 {number(row.output_tokens)}
                                             </td>
-                                            <td className="py-2 text-neutral-600">
+                                            <td className="py-2 text-muted tabular-nums">
                                                 {row.cost_estimate}
                                             </td>
                                         </tr>

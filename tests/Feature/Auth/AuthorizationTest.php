@@ -69,6 +69,6 @@ it('renders the anomaly workspace for reviewers', function () {
         ->assertInertia(
             fn ($page) => $page
                 ->component('anomalies/index')
-                ->where('auth.can.review', true),
+                ->where('can.review', true),
         );
 });

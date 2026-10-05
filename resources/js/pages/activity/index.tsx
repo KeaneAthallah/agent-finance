@@ -1,6 +1,20 @@
 import { Head, Link } from '@inertiajs/react';
 import { AppShell } from '@/components/layout/app-shell';
-import { Badge, Card, CardContent } from '@/components/ui';
+import DocumentController from '@/actions/App/Http/Controllers/DocumentController';
+import {
+    ActivityIcon,
+    AiIcon,
+    HumanIcon,
+    SystemIcon,
+} from '@/components/icons';
+import {
+    Badge,
+    Card,
+    CardContent,
+    EmptyState,
+    PageHeader,
+    PaginationLinks,
+} from '@/components/ui';
 import type { InertiaPageProps } from '@/types';
 
 type AuditEntry = {
@@ -25,13 +39,13 @@ type Props = InertiaPageProps & {
     filters: { action: string; actor_type: string };
 };
 
-const ACTOR_VARIANTS: Record<
+const ACTOR_META: Record<
     string,
-    'neutral' | 'blue' | 'green' | 'amber' | 'red' | 'purple'
+    { variant: 'blue' | 'purple' | 'neutral'; label: string }
 > = {
-    human: 'blue',
-    ai: 'purple',
-    system: 'neutral',
+    human: { variant: 'blue', label: 'Human' },
+    ai: { variant: 'purple', label: 'AI' },
+    system: { variant: 'neutral', label: 'System' },
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -45,27 +59,30 @@ const ACTION_LABELS: Record<string, string> = {
     'document.reprocess_requested': 'Reprocess requested',
 };
 
+const ACTOR_ICONS: Record<string, typeof HumanIcon> = {
+    human: HumanIcon,
+    ai: AiIcon,
+    system: SystemIcon,
+};
+
 export default function ActivityIndex({ logs, filters }: Props) {
     return (
-        <AppShell title="Activity">
+        <AppShell title="Activity" subtitle="Audit trail">
             <Head title="Activity" />
 
-            <p className="mb-4 max-w-3xl text-sm text-neutral-600">
-                Audit trail of every security-relevant action, with the actor
-                type distinguished: humans decide, AI recommends, the system
-                automates (spec §35).
-            </p>
+            <PageHeader
+                title="Activity"
+                description="Audit trail of every security-relevant action, with the actor type distinguished: humans decide, AI recommends, the system automates."
+            />
 
-            <Card>
-                <CardContent className="p-4">
-                    <form
-                        className="mb-4 flex flex-wrap items-end gap-3"
-                        method="get"
-                    >
+            {/* Filters */}
+            <Card className="mb-5">
+                <form id="activity-filters" method="get">
+                    <CardContent className="grid items-end gap-3 p-4 md:grid-cols-3">
                         <div>
                             <label
                                 htmlFor="filter_actor"
-                                className="mb-1 block text-xs font-medium text-neutral-600"
+                                className="mb-1 block text-sm font-medium text-muted"
                             >
                                 Actor type
                             </label>
@@ -73,7 +90,7 @@ export default function ActivityIndex({ logs, filters }: Props) {
                                 id="filter_actor"
                                 name="actor_type"
                                 defaultValue={filters.actor_type}
-                                className="h-10 rounded-md border border-neutral-300 bg-white px-2 text-sm"
+                                className="h-10 w-full cursor-pointer rounded-md border border-border-strong bg-surface px-2 text-sm text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none"
                             >
                                 <option value="">All</option>
                                 <option value="human">Human</option>
@@ -84,7 +101,7 @@ export default function ActivityIndex({ logs, filters }: Props) {
                         <div>
                             <label
                                 htmlFor="filter_action"
-                                className="mb-1 block text-xs font-medium text-neutral-600"
+                                className="mb-1 block text-sm font-medium text-muted"
                             >
                                 Action
                             </label>
@@ -92,7 +109,7 @@ export default function ActivityIndex({ logs, filters }: Props) {
                                 id="filter_action"
                                 name="action"
                                 defaultValue={filters.action}
-                                className="h-10 rounded-md border border-neutral-300 bg-white px-2 text-sm"
+                                className="h-10 w-full cursor-pointer rounded-md border border-border-strong bg-surface px-2 text-sm text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none"
                             >
                                 <option value="">All</option>
                                 {Object.keys(ACTION_LABELS).map((action) => (
@@ -104,105 +121,132 @@ export default function ActivityIndex({ logs, filters }: Props) {
                         </div>
                         <button
                             type="submit"
-                            className="h-10 rounded-md border border-neutral-300 bg-white px-4 text-sm font-medium text-neutral-900 hover:bg-neutral-50"
+                            form="activity-filters"
+                            className="h-10 cursor-pointer rounded-md bg-brand px-4 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-strong"
                         >
                             Apply filters
                         </button>
-                    </form>
+                    </CardContent>
+                </form>
+            </Card>
 
+            <Card>
+                <CardContent className="p-4">
                     {logs.data.length === 0 ? (
-                        <p className="py-8 text-center text-sm text-neutral-500">
-                            No audit entries yet.
-                        </p>
+                        <EmptyState
+                            icon={<ActivityIcon size={20} />}
+                            title="No audit entries yet"
+                            description="Security-relevant actions appear here as they happen."
+                        />
                     ) : (
-                        <ul className="divide-y divide-neutral-100">
-                            {logs.data.map((log) => (
-                                <li
-                                    key={log.id}
-                                    className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"
-                                >
-                                    <span className="flex min-w-0 items-center gap-2">
-                                        <Badge
-                                            variant={
-                                                ACTOR_VARIANTS[
-                                                    log.actor_type
-                                                ] ?? 'neutral'
-                                            }
-                                        >
-                                            {log.actor_type}
-                                        </Badge>
-                                        <span className="font-medium text-neutral-900">
-                                            {ACTION_LABELS[log.action] ??
-                                                log.action}
-                                        </span>
-                                        {log.subject_type === 'document' &&
-                                        log.subject_id ? (
-                                            <Link
-                                                href={`/documents/${log.subject_id}`}
-                                                className="text-blue-700 hover:underline"
-                                            >
-                                                document #{log.subject_id}
-                                            </Link>
-                                        ) : null}
-                                    </span>
-                                    <span className="flex items-center gap-3 text-xs text-neutral-500">
-                                        {log.actor_name ? (
-                                            <span>{log.actor_name}</span>
+                        <ol className="relative space-y-0">
+                            {logs.data.map((log, index) => {
+                                const actor =
+                                    ACTOR_META[log.actor_type] ??
+                                    ACTOR_META.system;
+                                const ActorIcon =
+                                    ACTOR_ICONS[log.actor_type] ?? SystemIcon;
+
+                                return (
+                                    <li
+                                        key={log.id}
+                                        className="relative flex gap-3 pb-4 last:pb-0"
+                                    >
+                                        {/* timeline rail */}
+                                        {index < logs.data.length - 1 ? (
+                                            <span
+                                                aria-hidden
+                                                className="absolute top-8 left-[15px] h-[calc(100%-24px)] w-px bg-border"
+                                            />
                                         ) : null}
                                         <span
-                                            className="max-w-xs truncate"
-                                            title={JSON.stringify(
-                                                log.properties ?? {},
-                                            )}
+                                            className={`z-10 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                                actor.variant === 'blue'
+                                                    ? 'bg-info-subtle text-info'
+                                                    : actor.variant === 'purple'
+                                                      ? 'bg-purple-subtle text-purple'
+                                                      : 'bg-elevated text-muted'
+                                            }`}
                                         >
-                                            {Object.keys(log.properties ?? {})
-                                                .length > 0
-                                                ? Object.entries(
-                                                      log.properties ?? {},
-                                                  )
-                                                      .slice(0, 2)
-                                                      .map(
-                                                          ([key, value]) =>
-                                                              `${key}: ${String(value)}`,
-                                                      )
-                                                      .join(' · ')
-                                                : ''}
+                                            <ActorIcon size={14} />
                                         </span>
-                                        <span className="tabular-nums">
-                                            {new Date(
-                                                log.created_at,
-                                            ).toLocaleString()}
-                                        </span>
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Badge variant={actor.variant}>
+                                                    {actor.label}
+                                                </Badge>
+                                                <span className="font-medium text-foreground">
+                                                    {ACTION_LABELS[
+                                                        log.action
+                                                    ] ?? log.action}
+                                                </span>
+                                                {log.subject_type ===
+                                                    'document' &&
+                                                log.subject_id ? (
+                                                    <Link
+                                                        href={DocumentController.show.url(
+                                                            {
+                                                                document:
+                                                                    log.subject_id,
+                                                            },
+                                                        )}
+                                                        className="text-xs font-medium text-brand hover:underline"
+                                                    >
+                                                        document #
+                                                        {log.subject_id}
+                                                    </Link>
+                                                ) : null}
+                                            </div>
+                                            <p className="mt-1 text-xs text-subtle">
+                                                {log.actor_name ? (
+                                                    <span className="flex items-center gap-1">
+                                                        <HumanIcon size={11} />
+                                                        {log.actor_name}
+                                                        {' · '}
+                                                    </span>
+                                                ) : null}
+                                                {new Date(
+                                                    log.created_at,
+                                                ).toLocaleString('id-ID')}
+                                            </p>
+                                            {log.properties &&
+                                            Object.keys(log.properties).length >
+                                                0 ? (
+                                                <p
+                                                    className="mt-1 max-w-xl truncate text-xs text-muted"
+                                                    title={JSON.stringify(
+                                                        log.properties,
+                                                        null,
+                                                        2,
+                                                    )}
+                                                >
+                                                    {Object.entries(
+                                                        log.properties,
+                                                    )
+                                                        .slice(0, 3)
+                                                        .map(
+                                                            ([key, value]) =>
+                                                                `${key}: ${String(
+                                                                    value,
+                                                                )}`,
+                                                        )
+                                                        .join(' · ')}
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ol>
                     )}
 
                     {logs.last_page > 1 ? (
-                        <div className="mt-4 flex items-center justify-between text-xs text-neutral-500">
-                            <span>
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                            <p className="text-xs text-subtle tabular-nums">
                                 Page {logs.current_page} of {logs.last_page} ·{' '}
                                 {logs.total} entries
-                            </span>
-                            <div className="flex gap-1">
-                                {logs.links.map((link, index) =>
-                                    link.url ? (
-                                        <Link
-                                            key={index}
-                                            href={link.url}
-                                            className={`rounded border px-2 py-1 ${
-                                                link.active
-                                                    ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                                    : 'border-neutral-200 hover:bg-neutral-50'
-                                            }`}
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    ) : null,
-                                )}
-                            </div>
+                            </p>
+                            <PaginationLinks links={logs.links} />
                         </div>
                     ) : null}
                 </CardContent>

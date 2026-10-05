@@ -61,10 +61,8 @@ class ReviewController extends Controller
             'documents' => DocumentResource::collection($documents),
             'openAnomalies' => $openAnomalies,
             'worstSeverities' => $severities->all(),
-            'auth' => [
-                'can' => [
-                    'review' => $user->can('review', Document::class),
-                ],
+            'can' => [
+                'review' => $user->can('review', Document::class),
             ],
         ]);
     }

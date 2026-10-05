@@ -49,7 +49,7 @@ it('lists review_required documents with anomaly counts', function () {
         ->assertInertia(fn ($page) => $page
             ->component('review/index')
             ->has('documents.data', 1)
-            ->where('auth.can.review', true));
+            ->where('can.review', true));
 });
 
 it('scopes the review queue to the user OPD', function () {

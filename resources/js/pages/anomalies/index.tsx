@@ -1,14 +1,24 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { useMemo } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import AnomalyController from '@/actions/App/Http/Controllers/AnomalyController';
+import DocumentController from '@/actions/App/Http/Controllers/DocumentController';
+import {
+    AlertCircleIcon,
+    BuildingIcon,
+    CheckCircleIcon,
+    InfoIcon,
+} from '@/components/icons';
 import {
     Badge,
     Button,
     Card,
     CardContent,
-    CardHeader,
-    CardTitle,
     EmptyState,
+    Label,
+    PageHeader,
+    PaginationLinks,
+    Select,
 } from '@/components/ui';
 import type { InertiaPageProps } from '@/types';
 
@@ -42,16 +52,15 @@ type Props = InertiaPageProps & {
     filters: { severity: string | null; type: string | null };
     severities: string[];
     types: string[];
-    auth: { can: { review: boolean } };
+    can: { review: boolean };
 };
 
-const SEVERITY_VARIANTS: Record<string, 'neutral' | 'blue' | 'amber' | 'red'> =
-    {
-        info: 'blue',
-        warning: 'amber',
-        high: 'red',
-        critical: 'red',
-    };
+const SEVERITY_VARIANTS: Record<string, 'blue' | 'amber' | 'red'> = {
+    info: 'blue',
+    warning: 'amber',
+    high: 'red',
+    critical: 'red',
+};
 
 const TYPE_LABELS: Record<string, string> = {
     total_mismatch: 'Total mismatch',
@@ -70,7 +79,7 @@ export default function AnomaliesIndex({
     filters,
     severities,
     types,
-    auth,
+    can,
 }: Props) {
     function filter(key: 'severity' | 'type', value: string) {
         router.get(
@@ -97,25 +106,37 @@ export default function AnomaliesIndex({
         );
     }
 
+    const rows = useMemo(
+        () =>
+            [...anomalies.data].sort((a, b) => {
+                const rank =
+                    (SEVERITY_RANK[a.severity] ?? 99) -
+                    (SEVERITY_RANK[b.severity] ?? 99);
+
+                return rank !== 0
+                    ? rank
+                    : new Date(b.created_at).getTime() -
+                          new Date(a.created_at).getTime();
+            }),
+        [anomalies.data],
+    );
+
     return (
-        <AppShell title="Anomalies">
+        <AppShell title="Anomalies" subtitle="Validation engine indicators">
             <Head title="Anomalies" />
 
-            <p className="mb-4 max-w-3xl text-sm text-neutral-600">
-                Factual anomaly indicators from the validation engine —
-                mismatches, duplicates, unknown references. Indicators, never
-                verdicts: a human decides what each one means. Open anomalies
-                block auto-approval.
-            </p>
+            <PageHeader
+                title="Anomalies"
+                description="Factual anomaly indicators from the validation engine — mismatches, duplicates, unknown references. Indicators, never verdicts: a human decides what each one means. Open anomalies block automatic approval."
+            />
 
-            <Card className="mb-4">
-                <CardContent className="flex items-end gap-4 p-4">
+            {/* Filters */}
+            <Card className="mb-5">
+                <CardContent className="grid items-end gap-3 p-4 md:grid-cols-3">
                     <div>
-                        <label className="mb-1 block text-xs font-medium text-neutral-500">
-                            Severity
-                        </label>
-                        <select
-                            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                        <Label htmlFor="filter-severity">Severity</Label>
+                        <Select
+                            id="filter-severity"
                             value={filters.severity ?? ''}
                             onChange={(event) =>
                                 filter('severity', event.target.value)
@@ -127,14 +148,12 @@ export default function AnomaliesIndex({
                                     {severity}
                                 </option>
                             ))}
-                        </select>
+                        </Select>
                     </div>
                     <div>
-                        <label className="mb-1 block text-xs font-medium text-neutral-500">
-                            Type
-                        </label>
-                        <select
-                            className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm"
+                        <Label htmlFor="filter-type">Type</Label>
+                        <Select
+                            id="filter-type"
                             value={filters.type ?? ''}
                             onChange={(event) =>
                                 filter('type', event.target.value)
@@ -146,26 +165,47 @@ export default function AnomaliesIndex({
                                     {typeLabel(type)}
                                 </option>
                             ))}
-                        </select>
+                        </Select>
                     </div>
+                    {(filters.severity !== null || filters.type !== null) && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                                router.get(
+                                    AnomalyController.index().url,
+                                    {},
+                                    {
+                                        preserveState: true,
+                                        preserveScroll: true,
+                                    },
+                                )
+                            }
+                        >
+                            Reset
+                        </Button>
+                    )}
                 </CardContent>
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Open anomalies ({anomalies.total})</CardTitle>
-                </CardHeader>
                 <CardContent className="p-4">
-                    {anomalies.data.length === 0 ? (
+                    <div className="mb-3 text-sm text-muted tabular-nums">
+                        {anomalies.total} open indicator
+                        {anomalies.total === 1 ? '' : 's'}
+                    </div>
+
+                    {rows.length === 0 ? (
                         <EmptyState
+                            icon={<CheckCircleIcon size={20} />}
                             title="No open anomalies"
                             description="Documents that pass every validation rule never appear here."
                         />
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                        <div className="scroll-thin overflow-x-auto">
+                            <table className="w-full min-w-[820px] text-sm">
                                 <thead>
-                                    <tr className="border-b border-neutral-200 text-left text-xs tracking-wide text-neutral-500 uppercase">
+                                    <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
                                         <th className="py-2 pr-4 font-medium">
                                             Severity
                                         </th>
@@ -178,81 +218,108 @@ export default function AnomaliesIndex({
                                         <th className="py-2 pr-4 font-medium">
                                             Document
                                         </th>
-                                        <th className="py-2 pr-4 font-medium">
+                                        <th className="hidden py-2 pr-4 font-medium md:table-cell">
                                             OPD
                                         </th>
-                                        <th className="py-2 pr-4 font-medium">
+                                        <th className="hidden py-2 pr-4 font-medium lg:table-cell">
                                             TA
                                         </th>
-                                        <th className="py-2 pr-4 font-medium">
+                                        <th className="hidden py-2 pr-4 font-medium sm:table-cell">
                                             Age
                                         </th>
                                         <th className="py-2 font-medium">
-                                            Actions
+                                            <span className="sr-only">
+                                                Actions
+                                            </span>
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {anomalies.data.map((anomaly) => (
+                                    {rows.map((anomaly) => (
                                         <tr
                                             key={anomaly.id}
-                                            className="border-b border-neutral-100 align-top"
+                                            className="border-b border-border align-top last:border-0 hover:bg-elevated"
                                         >
                                             <td className="py-2 pr-4">
                                                 <Badge
                                                     variant={
                                                         SEVERITY_VARIANTS[
                                                             anomaly.severity
-                                                        ] ?? 'neutral'
+                                                        ] ?? 'blue'
                                                     }
                                                 >
+                                                    {anomaly.severity ===
+                                                    'critical' ? (
+                                                        <AlertCircleIcon
+                                                            size={12}
+                                                        />
+                                                    ) : (
+                                                        <InfoIcon size={12} />
+                                                    )}
                                                     {anomaly.severity}
                                                 </Badge>
                                             </td>
                                             <td className="py-2 pr-4">
-                                                {typeLabel(anomaly.type)}
+                                                <span className="text-muted">
+                                                    {typeLabel(anomaly.type)}
+                                                </span>
                                             </td>
                                             <td className="max-w-xs py-2 pr-4">
-                                                <span className="font-medium text-neutral-900">
+                                                <span className="font-medium text-foreground">
                                                     {anomaly.title}
                                                 </span>
                                                 {anomaly.detail !== null && (
-                                                    <span className="mt-0.5 block text-xs text-neutral-500">
+                                                    <span className="mt-0.5 block text-xs text-muted">
                                                         {anomaly.detail}
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="py-2 pr-4">
+                                            <td className="max-w-[240px] py-2 pr-4">
                                                 <Link
-                                                    className="font-medium text-blue-700 hover:underline"
-                                                    href={`/documents/${anomaly.document.id}`}
+                                                    className="block truncate font-medium text-brand hover:underline"
+                                                    title={
+                                                        anomaly.document
+                                                            .original_filename
+                                                    }
+                                                    href={DocumentController.show.url(
+                                                        {
+                                                            document:
+                                                                anomaly.document
+                                                                    .id,
+                                                        },
+                                                    )}
                                                 >
                                                     {
                                                         anomaly.document
                                                             .original_filename
                                                     }
                                                 </Link>
-                                                <span className="mt-0.5 block text-xs text-neutral-500">
+                                                <span className="block truncate text-xs text-subtle">
                                                     {anomaly.document
                                                         .document_number ??
                                                         'no number'}
                                                 </span>
                                             </td>
-                                            <td className="py-2 pr-4">
-                                                {anomaly.document.opd?.code ??
-                                                    '—'}
+                                            <td className="hidden max-w-[140px] py-2 pr-4 md:table-cell">
+                                                <span className="inline-flex items-center gap-1.5 text-muted">
+                                                    <BuildingIcon size={13} />
+                                                    <span className="truncate">
+                                                        {anomaly.document.opd
+                                                            ?.name ?? '—'}
+                                                    </span>
+                                                </span>
                                             </td>
-                                            <td className="py-2 pr-4">
+                                            <td className="hidden py-2 pr-4 text-muted tabular-nums lg:table-cell">
                                                 {anomaly.document.fiscal_year ??
                                                     '—'}
                                             </td>
-                                            <td className="py-2 pr-4 text-xs text-neutral-500">
+                                            <td className="hidden py-2 pr-4 text-xs text-subtle tabular-nums sm:table-cell">
                                                 {new Date(
                                                     anomaly.created_at,
                                                 ).toLocaleDateString('id-ID')}
                                             </td>
                                             <td className="py-2">
-                                                {auth.can.review ? (
+                                                {can.review ? (
                                                     <div className="flex gap-2">
                                                         <Button
                                                             size="sm"
@@ -264,6 +331,9 @@ export default function AnomaliesIndex({
                                                                 )
                                                             }
                                                         >
+                                                            <CheckCircleIcon
+                                                                size={13}
+                                                            />
                                                             Resolve
                                                         </Button>
                                                         <Button
@@ -280,7 +350,7 @@ export default function AnomaliesIndex({
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-xs text-neutral-400">
+                                                    <span className="text-xs text-subtle">
                                                         read-only
                                                     </span>
                                                 )}
@@ -292,32 +362,24 @@ export default function AnomaliesIndex({
                         </div>
                     )}
 
-                    {anomalies.last_page > 1 && (
-                        <div className="mt-4 flex gap-2">
-                            {anomalies.links.map((link, index) =>
-                                link.url === null ? null : (
-                                    <button
-                                        key={index}
-                                        className={`h-8 min-w-8 rounded-md px-2 text-sm ${
-                                            link.active
-                                                ? 'bg-blue-700 text-white'
-                                                : 'border border-neutral-300 bg-white text-neutral-700'
-                                        }`}
-                                        onClick={() =>
-                                            router.get(link.url ?? '')
-                                        }
-                                    >
-                                        {link.label.replace(
-                                            /&laquo;|&raquo;/g,
-                                            '',
-                                        )}
-                                    </button>
-                                ),
-                            )}
+                    {anomalies.last_page > 1 ? (
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                            <p className="text-xs text-subtle tabular-nums">
+                                Page {anomalies.current_page} of{' '}
+                                {anomalies.last_page}
+                            </p>
+                            <PaginationLinks links={anomalies.links} />
                         </div>
-                    )}
+                    ) : null}
                 </CardContent>
             </Card>
         </AppShell>
     );
 }
+
+const SEVERITY_RANK: Record<string, number> = {
+    critical: 0,
+    high: 1,
+    warning: 2,
+    info: 3,
+};

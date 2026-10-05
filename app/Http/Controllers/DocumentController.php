@@ -63,10 +63,8 @@ class DocumentController extends Controller
                 'search' => $request->string('search')->toString(),
             ],
             'documentTypes' => DocumentType::query()->where('is_active', true)->orderBy('name')->get(['id', 'code', 'name']),
-            'auth' => [
-                'can' => [
-                    'create' => $user->can('create', Document::class),
-                ],
+            'can' => [
+                'create' => $user->can('create', Document::class),
             ],
         ]);
     }
@@ -219,10 +217,8 @@ class DocumentController extends Controller
                     : null,
                 'created_at' => $review->created_at->toIso8601String(),
             ])->all(),
-            'auth' => [
-                'can' => [
-                    'review' => $user->can('review', $document),
-                ],
+            'can' => [
+                'review' => $user->can('review', $document),
             ],
             'sihandal' => [
                 'matches' => $matches->map(fn (SihandalMatch $match) => [

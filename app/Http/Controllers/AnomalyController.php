@@ -60,10 +60,8 @@ final class AnomalyController extends Controller
             ],
             'severities' => AnomalySeverity::values(),
             'types' => AnomalyType::values(),
-            'auth' => [
-                'can' => [
-                    'review' => $user->can('review', Document::class),
-                ],
+            'can' => [
+                'review' => $user->can('review', Document::class),
             ],
         ]);
     }

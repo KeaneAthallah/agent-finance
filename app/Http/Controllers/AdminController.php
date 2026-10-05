@@ -65,10 +65,8 @@ final class AdminController extends Controller
                 ])->values()->all())
                 ->all(),
             'health' => $this->health(),
-            'auth' => [
-                'can' => [
-                    'manage' => $user->isSuperAdmin(),
-                ],
+            'can' => [
+                'manage' => $user->isSuperAdmin(),
             ],
         ]);
     }
