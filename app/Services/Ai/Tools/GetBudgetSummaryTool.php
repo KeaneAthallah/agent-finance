@@ -19,7 +19,7 @@ final class GetBudgetSummaryTool implements ToolInterface
 
     public function description(): string
     {
-        return 'Get the total extracted budget/expenditure amounts for a fiscal year, grouped by document type, across the documents the user can access.';
+        return 'Get the total extracted budget/expenditure amounts for a fiscal year, grouped by document type, across the documents uploaded to Agent Finance (not SIHANDAL — use get_sihandal_data for SIHANDAL data).';
     }
 
     /**
