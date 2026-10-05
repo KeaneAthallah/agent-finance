@@ -22,6 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && docker-php-ext-install -j$(nproc) gd pdo_mysql bcmath zip \
     && rm -rf /var/lib/apt/lists/*
 
+# Large document uploads: raise PHP's body and memory limits
+# (the app's DOCUMENTS_MAX_SIZE_KB must stay within these).
+RUN printf 'upload_max_filesize=128M\npost_max_size=128M\nmemory_limit=512M\n' > "$PHP_INI_DIR/conf.d/99-agent-finance.ini"
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Node 22 for the frontend build (used by `php artisan dev` flows too).
