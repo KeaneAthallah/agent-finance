@@ -37,15 +37,17 @@ final class SecurityHeaders
     }
 
     /**
-     * Strict default policy. `style-src 'unsafe-inline'` is
-     * required by compiled Tailwind; local development adds
-     * script/font/style exceptions for the Vite dev server
-     * (HMR runtime, bundled fonts) on every loopback origin.
+     * Strict default policy. Local development runs against
+     * the Vite dev server on arbitrary loopback hosts and
+     * ports — including IPv6 [::1], for which CSP has no
+     * portable any-port wildcard — so dev gets a permissive
+     * script/style/font policy. Framing, base URIs and
+     * form targets stay locked down in every environment.
      */
     private function contentSecurityPolicy(): string
     {
         if (app()->environment('local')) {
-            return "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:* http://[::1]:*; style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:* http://[::1]:*; img-src 'self' data:; font-src 'self' http://localhost:* http://127.0.0.1:* http://[::1]:*; connect-src 'self' ws://localhost:* ws://127.0.0.1:* ws://[::1]:* http://localhost:* http://127.0.0.1:* http://[::1]:*; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+            return "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src * ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         }
 
         return "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";

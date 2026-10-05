@@ -61,6 +61,18 @@ it('enforces a strict content security policy', function () {
         ->not->toContain('unsafe-eval');
 });
 
+it('keeps framing locked down in the permissive local policy', function () {
+    config(['app.env' => 'local']);
+
+    $response = get('/login');
+
+    $csp = (string) $response->headers->get('Content-Security-Policy');
+    expect($csp)
+        ->toContain("frame-ancestors 'none'")
+        ->toContain("base-uri 'self'")
+        ->toContain("form-action 'self'");
+});
+
 it('throttles the login form and the AI chat', function () {
     $routes = Route::getRoutes();
 
