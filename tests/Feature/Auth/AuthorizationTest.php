@@ -52,13 +52,13 @@ it('allows only admins into administration', function () {
 
 it('returns the placeholder payload for later-phase sections', function () {
     actingAs(testUser(UserRole::Verifier->value, testOpd()))
-        ->get(route('reports.index'))
+        ->get(route('validation.index'))
         ->assertOk()
         ->assertInertia(
             fn ($page) => $page
                 ->component('placeholder')
-                ->where('title', 'Reports')
-                ->where('phase', 'Phase 9 — Reports, Admin & Cost'),
+                ->where('title', 'Validation')
+                ->where('phase', 'Phase 5 — Review, Validation & Audit'),
         );
 });
 

@@ -213,12 +213,30 @@ Status legend: ✅ done · 🚧 in progress · ⬜ not started
 - FakeAIProvider embeddings are bag-of-words (shared
   vocabulary → similar vectors), deterministic for tests
 
-### Phase 9 — Reports, Admin, Cost ⬜
+### Phase 9 — Reports, Admin, Cost ✅
 
-- Reports (documents processed, confidence distribution, review workload,
-  sync health, AI token/cost dashboard)
-- Admin area: users, roles, OPDs, document types, AI prompts (versioned,
-  active-prompt immutability), settings, system health
+- Reports (`/reports`): documents processed (status,
+  fiscal-year trend, top types), extraction confidence
+  distribution, review workload (open anomalies by
+  severity, pending SIHANDAL confirmations), sync health,
+  AI token/cost dashboard (totals + per-model breakdown)
+- Reports are platform-wide for super admins, OPD-scoped
+  for everyone else (§36) — document metrics, confidence,
+  anomalies, syncs and document-tied AI usage
+- Admin (`/administration`): users (role/OPD/active
+  editing), OPDs (create/rename/deactivate), document-type
+  activation, AI prompt versions, system health
+- Settings (`/settings`): read-only effective
+  configuration (AI, OCR, SIHANDAL, validation,
+  documents, queue) — no write path
+- Prompt immutability enforced (§33): storePrompt inserts
+  a new version row and moves is_active; activatePrompt
+  only flips the flag — existing rows are never rewritten
+- Admin mutations are super-admin-only and audit-logged
+  (user.updated, opd.created/updated, document_type.updated,
+  prompt.created/activated)
+- DocumentExtractionField::extraction now declares the
+  real FK (document_extraction_id); Opd casts is_active
 
 ### Phase 10 — Hardening ⬜
 

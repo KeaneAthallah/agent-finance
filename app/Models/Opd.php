@@ -22,6 +22,13 @@ class Opd extends Model
 
     protected $fillable = ['code', 'name', 'is_active'];
 
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+        ];
+    }
+
     /**
      * Users belonging to this OPD.
      *

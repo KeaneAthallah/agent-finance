@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\AiPrompt;
 use App\Models\Document;
 use App\Models\DocumentAnomaly;
+use App\Models\DocumentType;
 use App\Models\Opd;
 use App\Models\User;
 use App\Services\Ai\AIProviderInterface;
@@ -61,6 +63,8 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             'opd' => Opd::class,
             'document_anomaly' => DocumentAnomaly::class,
+            'document_type' => DocumentType::class,
+            'ai_prompt' => AiPrompt::class,
         ]);
 
         // Auto-start processing after upload (spec §30). QueueDocumentProcessing

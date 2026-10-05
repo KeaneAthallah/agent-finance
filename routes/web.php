@@ -1,13 +1,16 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\AnomalyController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SectionController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SihandalController;
 use App\Http\Controllers\SihandalMatchController;
 use Illuminate\Support\Facades\Route;
@@ -58,10 +61,21 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai.assistant.chat');
 
     Route::get('/activity', [ActivityController::class, 'index'])->name('activity.index');
-    Route::get('/reports', [SectionController::class, 'reports'])->name('reports.index');
+    Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
 
+    // Platform surface (spec §44): settings are a read-only
+    // view of the effective configuration; administration is
+    // the control surface. Page access is admin-only; the
+    // mutations inside are super-admin-only (§36).
     Route::middleware('role:admin')->group(function (): void {
-        Route::get('/settings', [SectionController::class, 'settings'])->name('settings.index');
-        Route::get('/administration', [SectionController::class, 'administration'])->name('admin.index');
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::get('/administration', [AdminController::class, 'index'])->name('admin.index');
+
+        Route::post('/administration/users/{user}', [AdminController::class, 'updateUser'])->name('admin.users.update');
+        Route::post('/administration/opds', [AdminController::class, 'storeOpd'])->name('admin.opds.store');
+        Route::post('/administration/opds/{opd}', [AdminController::class, 'updateOpd'])->name('admin.opds.update');
+        Route::post('/administration/document-types/{documentType}', [AdminController::class, 'updateDocumentType'])->name('admin.document-types.update');
+        Route::post('/administration/prompts', [AdminController::class, 'storePrompt'])->name('admin.prompts.store');
+        Route::post('/administration/prompts/{prompt}/activate', [AdminController::class, 'activatePrompt'])->name('admin.prompts.activate');
     });
 });

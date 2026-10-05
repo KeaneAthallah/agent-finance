@@ -44,6 +44,6 @@ final class DocumentExtractionField extends Model
      */
     public function extraction(): BelongsTo
     {
-        return $this->belongsTo(DocumentExtraction::class);
+        return $this->belongsTo(DocumentExtraction::class, 'document_extraction_id');
     }
 }
