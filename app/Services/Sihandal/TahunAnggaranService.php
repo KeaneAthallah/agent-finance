@@ -13,7 +13,8 @@ final class TahunAnggaranService
     /**
      * Resolve a fiscal year (e.g. 2026) to the SIHANDAL
      * tahun_anggaran id, or null when SIHANDAL has no
-     * such year (callers then skip the year filter).
+     * such year (callers must then fail loudly — an
+     * unfiltered query would return every year's data).
      */
     public function idForYear(int $year, SihandalApiInterface $sihandal): ?int
     {

@@ -8,6 +8,13 @@ use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\Opd;
 use App\Models\User;
+use App\Services\Ai\AiChatRequest;
+use App\Services\Ai\AiChatResult;
+use App\Services\Ai\AiDocumentRequest;
+use App\Services\Ai\AiDocumentResult;
+use App\Services\Ai\AiEmbeddingResult;
+use App\Services\Ai\AiExtractionRequest;
+use App\Services\Ai\AiExtractionResult;
 use App\Services\Ai\AIProviderInterface;
 use App\Services\Ai\Tools\ToolRegistry;
 use Database\Seeders\AgentFinanceSeeder;
@@ -186,6 +193,94 @@ it('validates the question and history shape', function () {
         ->assertJsonValidationErrorFor('history.0.role');
 });
 
+it('lists SIHANDAL data through the assistant', function () {
+    $this->seed(AgentFinanceSeeder::class);
+
+    actingAs(aiOpdUser());
+
+    post('/ai-assistant/chat', [
+        'question' => 'kegiatan apa saja tahun 2026?',
+    ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('tool_calls.0.name', 'get_sihandal_data')
+        ->assertJsonPath('tool_calls.0.arguments.resource', 'kegiatan')
+        ->assertJsonPath('statements.0.label', 'FACT')
+        ->assertJsonPath('statements.0.source', 'get_sihandal_data');
+});
+
+it('warns for a fiscal year SIHANDAL does not have', function () {
+    $this->seed(AgentFinanceSeeder::class);
+
+    actingAs(aiOpdUser());
+
+    // The fake SIHANDAL only knows 2025 and 2026.
+    post('/ai-assistant/chat', [
+        'question' => 'Berapa total pendapatan tahun 2024?',
+    ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('tool_calls.0.name', 'get_sihandal_data')
+        ->assertJsonPath('tool_calls.0.arguments.resource', 'penerimaan')
+        ->assertJsonPath('statements.0.label', 'WARNING');
+
+    $response = json_decode(post('/ai-assistant/chat', [
+        'question' => 'Berapa total pendapatan tahun 2024?',
+    ], ['Accept' => 'application/json'])->getContent(), true);
+
+    // No FACT statement may present another year's
+    // data as 2024 data.
+    $spoken = json_encode($response['statements']);
+
+    expect(collect($response['statements'])->where('label', 'FACT'))->toBeEmpty()
+        ->and(str()->contains($spoken, '2024'))->toBeTrue();
+});
+
+it('parses answers the model wraps in code fences', function () {
+    $this->seed(AgentFinanceSeeder::class);
+
+    app()->instance(AIProviderInterface::class, new class implements AIProviderInterface
+    {
+        public function analyzeDocument(AiDocumentRequest $request): AiDocumentResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function extractStructuredData(AiExtractionRequest $request): AiExtractionResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function generateEmbedding(string $text, string $model): AiEmbeddingResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function chat(AiChatRequest $request): AiChatResult
+        {
+            return new AiChatResult(
+                content: '```json'.json_encode([
+                    'summary' => 'Terjadi kenaikan.',
+                    'statements' => [
+                        ['label' => 'FACT', 'text' => 'PAD naik.', 'source' => 'get_revenue'],
+                        ['label' => 'AI INTERPRETATION', 'text' => 'Tren positif.', 'source' => null],
+                    ],
+                ]).'```',
+                meta: ['provider' => 'stub'],
+            );
+        }
+    });
+
+    actingAs(aiOpdUser());
+
+    post('/ai-assistant/chat', [
+        'question' => 'test',
+    ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('summary', 'Terjadi kenaikan.')
+        ->assertJsonPath('statements.0.label', 'FACT')
+        ->assertJsonPath('statements.0.source', 'get_revenue')
+        ->assertJsonPath('statements.1.label', 'AI INTERPRETATION');
+});
+
 it('exposes only read-only tools', function () {
     $this->seed(AgentFinanceSeeder::class);
 
@@ -198,9 +293,7 @@ it('exposes only read-only tools', function () {
     expect($names)->toBe([
         'compare_document_with_sihandal',
         'get_budget_summary',
-        'get_expenditure',
-        'get_opd',
-        'get_revenue',
+        'get_sihandal_data',
         'search_documents',
         'validate_document',
     ]);

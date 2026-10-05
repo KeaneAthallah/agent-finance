@@ -317,8 +317,12 @@ User question → intent detection → tool selection
 → structured result → LLM explanation (grounded in tool results)
 ```
 
-- Tools: `get_opd`, `get_budget_summary`, `get_revenue`, `get_expenditure`,
-  `search_documents`, `validate_document`, `compare_document_with_sihandal`, ...
+- Tools: `get_sihandal_data` (every SIHANDAL list
+  resource: opds, programs, kegiatan, sub_kegiatan,
+  belanja, rekenings, sumber_dana, penerimaan,
+  pengeluaran), `get_budget_summary`,
+  `search_documents`, `validate_document`,
+  `compare_document_with_sihandal`, ...
 - Financial numbers always come from tool results, never from the LLM.
   Responses label statements as FACT / CALCULATION / AI INTERPRETATION / WARNING.
 - Chat is read-only by design: it can propose, never execute writes.

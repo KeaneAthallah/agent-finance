@@ -163,11 +163,35 @@ final class ChatService
     }
 
     /**
+     * Extract the first markdown code block, or the
+     * trimmed content when no block is present.
+     */
+    private function unwrapFencedJson(string $content): string
+    {
+        if (preg_match('/```[a-zA-Z0-9_-]*\s*(.*?)\s*```/s', $content, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return trim($content);
+    }
+
+    /**
      * @return array{summary: string, statements: array<int, ChatStatement>}
      */
     private function parseAnswer(string $content): array
     {
         $decoded = json_decode($content, true);
+
+        if (! is_array($decoded)) {
+            // Models frequently wrap the JSON object in
+            // markdown code fences despite the contract —
+            // unwrap it so the labeled statements still parse.
+            $unwrapped = $this->unwrapFencedJson($content);
+
+            if ($unwrapped !== $content) {
+                $decoded = json_decode($unwrapped, true);
+            }
+        }
 
         if (! is_array($decoded)) {
             // Providers that answer in prose still get the

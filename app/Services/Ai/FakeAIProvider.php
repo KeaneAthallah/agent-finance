@@ -179,9 +179,15 @@ final class FakeAIProvider implements AIProviderInterface
             ['pattern' => '/(banding|perbandingan|compare|versus|\bsihandal\b)/', 'tool' => 'compare_document_with_sihandal', 'arguments' => ['document_id' => $id]],
             ['pattern' => '/(cari|search|temukan|find|mencari)/', 'tool' => 'search_documents', 'arguments' => ['query' => $question]],
             ['pattern' => '/(validasi|anomali|validate|validation)/', 'tool' => 'validate_document', 'arguments' => ['document_id' => $id]],
-            ['pattern' => '/(\bopd\b|unit kerja|satuan kerja)/', 'tool' => 'get_opd', 'arguments' => []],
-            ['pattern' => '/(penerimaan|pendapatan|revenue)/', 'tool' => 'get_revenue', 'arguments' => ['fiscal_year' => $year]],
-            ['pattern' => '/(pengeluaran|belanja|expenditure)/', 'tool' => 'get_expenditure', 'arguments' => ['fiscal_year' => $year]],
+            ['pattern' => '/(sub[\s-]?kegiatan)/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'sub_kegiatan', 'fiscal_year' => $year]],
+            ['pattern' => '/\bkegiatan\b/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'kegiatan', 'fiscal_year' => $year]],
+            ['pattern' => '/\bprogram/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'programs']],
+            ['pattern' => '/\bbelanja\b/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'belanja', 'fiscal_year' => $year]],
+            ['pattern' => '/(penerimaan|pendapatan|revenue)/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'penerimaan', 'fiscal_year' => $year]],
+            ['pattern' => '/(pengeluaran|expenditure)/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'pengeluaran', 'fiscal_year' => $year]],
+            ['pattern' => '/\brekening/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'rekenings']],
+            ['pattern' => '/(sumber[\s-]?dana)/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'sumber_dana']],
+            ['pattern' => '/(\bopd\b|unit kerja|satuan kerja)/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'opds']],
         ];
 
         foreach ($intents as $intent) {
@@ -276,9 +282,12 @@ final class FakeAIProvider implements AIProviderInterface
                 'Status dokumen: %s.',
                 (string) ($result['status'] ?? '?'),
             ),
-            'get_opd' => sprintf('Ditemukan %d OPD.', count($result['opds'] ?? [])),
-            'get_revenue' => sprintf('Ditemukan %d catatan penerimaan.', count($result['penerimaan'] ?? [])),
-            'get_expenditure' => sprintf('Ditemukan %d catatan pengeluaran.', count($result['pengeluaran'] ?? [])),
+            'get_sihandal_data' => sprintf(
+                'Ditemukan %d dari %d entri %s.',
+                (int) ($result['count'] ?? 0),
+                (int) ($result['total'] ?? 0),
+                (string) ($result['resource'] ?? 'data SIHANDAL')
+            ),
             default => 'Data: '.mb_substr((string) json_encode($result), 0, 200),
         };
     }

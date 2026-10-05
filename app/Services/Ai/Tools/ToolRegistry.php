@@ -16,9 +16,7 @@ final class ToolRegistry
         GetBudgetSummaryTool::class,
         SearchDocumentsTool::class,
         CompareDocumentWithSihandalTool::class,
-        GetOpdTool::class,
-        GetRevenueTool::class,
-        GetExpenditureTool::class,
+        GetSihandalDataTool::class,
         ValidateDocumentTool::class,
     ];
 

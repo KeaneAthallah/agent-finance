@@ -114,10 +114,15 @@ final class SihandalClient implements SihandalApiInterface
     {
         $ttl = (int) config('agent-finance.sihandal.cache_ttl', 300);
 
-        return Cache::remember(
+        // Only arrays are cached: the database cache store refuses to
+        // unserialize PHP classes (serializable_classes), so caching
+        // the collection object itself would read back as an
+        // incomplete class on every cache hit.
+        /** @var array{data?: array<int, array<string, mixed>>, meta?: array<string, mixed>} $payload */
+        $payload = Cache::remember(
             'sihandal:'.md5($endpoint.serialize($filters)),
             $ttl,
-            function () use ($endpoint, $filters): SihandalCollection {
+            function () use ($endpoint, $filters): array {
                 $response = Http::baseUrl((string) config('agent-finance.sihandal.base_url'))
                     ->withToken((string) config('agent-finance.sihandal.api_key'))
                     ->timeout((int) config('agent-finance.sihandal.timeout', 15))
@@ -126,16 +131,15 @@ final class SihandalClient implements SihandalApiInterface
 
                 $response->throw();
 
-                /** @var array{data?: array<int, array<string, mixed>>, meta?: array<string, mixed>} $payload */
-                $payload = $response->json() ?? [];
-
-                return new SihandalCollection(
-                    items: $payload['data'] ?? [],
-                    total: isset($payload['meta']['total']) ? (int) $payload['meta']['total'] : null,
-                    page: isset($payload['meta']['current_page']) ? (int) $payload['meta']['current_page'] : null,
-                    meta: $payload['meta'] ?? [],
-                );
+                return $response->json() ?? [];
             },
+        );
+
+        return new SihandalCollection(
+            items: $payload['data'] ?? [],
+            total: isset($payload['meta']['total']) ? (int) $payload['meta']['total'] : null,
+            page: isset($payload['meta']['current_page']) ? (int) $payload['meta']['current_page'] : null,
+            meta: $payload['meta'] ?? [],
         );
     }
 }
