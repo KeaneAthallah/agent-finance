@@ -8,7 +8,7 @@ namespace App\Services\Ai;
 final class AiChatResult
 {
     /**
-     * @param  array<int, array{name: string, arguments: array<string, mixed>}>  $toolCalls
+     * @param  array<int, array{id?: string, name: string, arguments: array<string, mixed>, thought_signature?: string|null}>  $toolCalls
      * @param  array<string, mixed>  $meta
      */
     public function __construct(

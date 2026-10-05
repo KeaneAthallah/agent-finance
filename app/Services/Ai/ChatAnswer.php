@@ -11,7 +11,7 @@ final class ChatAnswer
 {
     /**
      * @param  array<int, ChatStatement>  $statements
-     * @param  array<int, array{name: string, arguments: array<string, mixed>}>  $toolCalls
+     * @param  array<int, array{id?: string, name: string, arguments: array<string, mixed>, thought_signature?: string|null}>  $toolCalls
      * @param  array<string, mixed>  $meta
      */
     public function __construct(
@@ -22,7 +22,7 @@ final class ChatAnswer
     ) {}
 
     /**
-     * @return array{summary: string, statements: array<int, array{label: string, text: string, source: string|null}>, tool_calls: array<int, array{name: string, arguments: array<string, mixed>}>, meta: array<string, mixed>}
+     * @return array{summary: string, statements: array<int, array{label: string, text: string, source: string|null}>, tool_calls: array<int, array{id?: string, name: string, arguments: array<string, mixed>, thought_signature?: string|null}>, meta: array<string, mixed>}
      */
     public function toArray(): array
     {

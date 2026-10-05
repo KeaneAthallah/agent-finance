@@ -112,10 +112,17 @@ SPEC;
 
     public function chat(AiChatRequest $request): AiChatResult
     {
-        $payload = $this->complete($request->messages);
+        /** @var array<int, array{name: string, description: string, parameters: array<string, mixed>}> $tools */
+        $tools = $request->tools;
+
+        $payload = $this->complete(
+            $this->protocolMessages($request->messages),
+            $tools === [] ? [] : ['tools' => $this->toolDefinitions($tools)],
+        );
 
         return new AiChatResult(
             content: $payload['content'] ?? '',
+            toolCalls: $payload['tool_calls'] ?? [],
             meta: ['provider' => 'openai', 'model' => $payload['model'] ?? null],
         );
     }
@@ -133,9 +140,9 @@ SPEC;
     }
 
     /**
-     * @param  array<int, array{role: string, content: string}>  $messages
+     * @param  array<int, array<string, mixed>>  $messages
      * @param  array<string, mixed>  $extra
-     * @return array{content?: string, model?: string, input_tokens?: int, output_tokens?: int}
+     * @return array{content?: string, model?: string, input_tokens?: int, output_tokens?: int, tool_calls?: array<int, array{id?: string, name: string, arguments: array<string, mixed>, thought_signature?: string|null}>}
      */
     private function complete(array $messages, array $extra = []): array
     {
@@ -156,20 +163,140 @@ SPEC;
         /** @var array<string, mixed> $body */
         $body = $response->json() ?? [];
 
-        /** @var array<int, array{message?: array{content?: string}}> $choices */
+        /** @var array<int, array{message?: array{content?: string, tool_calls?: mixed}}> $choices */
         $choices = is_array($body['choices'] ?? null) ? $body['choices'] : [];
+
+        /** @var array{content?: string, tool_calls?: mixed} $message */
+        $message = is_array($choices[0]['message'] ?? null) ? $choices[0]['message'] : [];
 
         $model = $body['model'] ?? null;
 
         /** @var array{prompt_tokens?: int, completion_tokens?: int}|null $usage */
         $usage = isset($body['usage']) && is_array($body['usage']) ? $body['usage'] : null;
 
+        /** @var array<int, array{id?: string, 'function'?: array{name?: string, arguments?: string}, extra_content?: array{google?: array{thought_signature?: string}}}> $rawCalls */
+        $rawCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+
+        $toolCalls = [];
+
+        foreach ($rawCalls as $rawCall) {
+            $function = is_array($rawCall['function'] ?? null) ? $rawCall['function'] : [];
+
+            $decoded = json_decode((string) ($function['arguments'] ?? '{}'), true);
+
+            /** @var array<string, mixed> $arguments */
+            $arguments = is_array($decoded) ? $decoded : [];
+
+            $toolCalls[] = [
+                'id' => $rawCall['id'] ?? null,
+                'name' => (string) ($function['name'] ?? ''),
+                'arguments' => $arguments,
+                'thought_signature' => $rawCall['extra_content']['google']['thought_signature'] ?? null,
+            ];
+        }
+
         return [
-            'content' => $choices[0]['message']['content'] ?? '',
+            'content' => is_string($message['content'] ?? null) ? $message['content'] : '',
             'model' => is_string($model) ? $model : null,
             'input_tokens' => $usage['prompt_tokens'] ?? null,
             'output_tokens' => $usage['completion_tokens'] ?? null,
+            'tool_calls' => $toolCalls,
         ];
+    }
+
+    /**
+     * Map the registry's tool definitions to the
+     * OpenAI function-calling wire format.
+     *
+     * @param  array<int, array{name: string, description: string, parameters: array<string, mixed>}>  $tools
+     * @return array<int, array<string, mixed>>
+     */
+    private function toolDefinitions(array $tools): array
+    {
+        return array_map(
+            static fn (array $tool): array => [
+                'type' => 'function',
+                'function' => [
+                    'name' => (string) $tool['name'],
+                    'description' => (string) $tool['description'],
+                    'parameters' => $tool['parameters'] !== [] ? $tool['parameters'] : (object) [],
+                ],
+            ],
+            $tools,
+        );
+    }
+
+    /**
+     * Normalize chat history into the wire protocol. Assistant
+     * tool-call turns — persisted by ChatService as JSON content —
+     * become structured tool_calls, and each tool message is paired
+     * with its call via tool_call_id. Gemini additionally requires
+     * the round-1 thought signature to be echoed with the call.
+     *
+     * @param  array<int, array{role: string, content: string}>  $messages
+     * @return array<int, array<string, mixed>>
+     */
+    private function protocolMessages(array $messages): array
+    {
+        $normalized = [];
+        $pendingIds = [];
+
+        foreach ($messages as $message) {
+            $role = (string) $message['role'];
+            $content = (string) $message['content'];
+
+            if ($role === 'assistant') {
+                $decoded = json_decode($content, true);
+
+                if (is_array($decoded) && ($decoded['tool_calls'] ?? false)) {
+                    /** @var array<int, array<string, mixed>> $rawToolCalls */
+                    $rawToolCalls = $decoded['tool_calls'];
+
+                    $calls = [];
+
+                    foreach ($rawToolCalls as $call) {
+                        $wire = [
+                            'id' => (string) ($call['id'] ?? 'call_'.count($calls)),
+                            'type' => 'function',
+                            'function' => [
+                                'name' => (string) ($call['name'] ?? ''),
+                                'arguments' => is_array($call['arguments'] ?? null)
+                                    ? (string) json_encode($call['arguments'])
+                                    : (string) ($call['arguments'] ?? '{}'),
+                            ],
+                        ];
+
+                        $signature = (string) ($call['thought_signature'] ?? '');
+
+                        if ($signature !== '') {
+                            $wire['extra_content'] = ['google' => ['thought_signature' => $signature]];
+                        }
+
+                        $calls[] = $wire;
+                    }
+
+                    $pendingIds = array_column($calls, 'id');
+
+                    $normalized[] = ['role' => 'assistant', 'content' => '', 'tool_calls' => $calls];
+
+                    continue;
+                }
+            }
+
+            if ($role === 'tool' && $pendingIds !== []) {
+                $normalized[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => (string) array_shift($pendingIds),
+                    'content' => $content,
+                ];
+
+                continue;
+            }
+
+            $normalized[] = $message;
+        }
+
+        return $normalized;
     }
 
     /**
