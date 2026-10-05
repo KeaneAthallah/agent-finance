@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\StartDocumentProcessingAction;
 use App\Actions\UploadDocumentAction;
 use App\Exceptions\DuplicateDocumentException;
+use App\Exceptions\MalwareDetectedException;
 use App\Http\Requests\StoreDocumentRequest;
 use App\Http\Resources\DocumentExtractionResource;
 use App\Http\Resources\DocumentResource;
@@ -104,6 +105,18 @@ class DocumentController extends Controller
             return redirect()
                 ->route('documents.index')
                 ->withErrors(['file' => $payload['message'].' (existing #'.$exception->existing->id.')']);
+        } catch (MalwareDetectedException $exception) {
+            // Spec §7: infected files are never persisted.
+            if ($request->expectsJson()) {
+                return response()->json(
+                    ['message' => $exception->getMessage()],
+                    422,
+                );
+            }
+
+            return redirect()
+                ->route('documents.index')
+                ->withErrors(['file' => $exception->getMessage()]);
         }
 
         if ($request->expectsJson()) {

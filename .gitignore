@@ -1,4 +1,5 @@
 /.phpunit.cache
+/.commandcode
 /bootstrap/ssr
 /node_modules
 /public/build
@@ -8,6 +9,8 @@
 /resources/js/actions
 /resources/js/routes
 /resources/js/wayfinder
+/playwright-report
+/test-results
 /storage/*.key
 /storage/pail
 /vendor

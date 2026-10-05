@@ -17,6 +17,9 @@ use App\Services\Extraction\ExtractionSchemaRegistry;
 use App\Services\Ocr\FakeOcrProvider;
 use App\Services\Ocr\OcrProviderInterface;
 use App\Services\Ocr\TesseractProvider;
+use App\Services\Security\ClamAvScanner;
+use App\Services\Security\FakeMalwareScanner;
+use App\Services\Security\MalwareScannerInterface;
 use App\Services\Sihandal\FakeSihandalClient;
 use App\Services\Sihandal\SihandalApiInterface;
 use App\Services\Sihandal\SihandalClient;
@@ -47,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
         $this->bindOcrProvider();
         $this->bindSihandalClient();
         $this->bindValidationEngine();
+        $this->bindMalwareScanner();
     }
 
     /**
@@ -134,6 +138,21 @@ class AppServiceProvider extends ServiceProvider
                 'fake' => $app->make(FakeOcrProvider::class),
                 'tesseract' => $app->make(TesseractProvider::class),
                 default => $app->make(FakeOcrProvider::class),
+            };
+        });
+    }
+
+    /**
+     * Malware scanner (spec §7): configuration-only
+     * driver swap. Fake keeps dev/tests offline; ClamAV
+     * when the engine is installed on the host.
+     */
+    private function bindMalwareScanner(): void
+    {
+        $this->app->bind(MalwareScannerInterface::class, function (Application $app) {
+            return match (config('agent-finance.security.malware_driver')) {
+                'clamav' => $app->make(ClamAvScanner::class),
+                default => $app->make(FakeMalwareScanner::class),
             };
         });
     }

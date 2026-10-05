@@ -80,4 +80,16 @@ return [
         'review_confidence' => (float) env('VALIDATION_REVIEW_CONFIDENCE', 0.85),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Security (spec §7, §35)
+    |--------------------------------------------------------------------------
+    | Malware scanning on upload. Driver is configuration only:
+    | "fake" keeps dev/tests offline, "clamav" shells out to
+    | clamscan when the engine is installed on the host.
+    */
+    'security' => [
+        'malware_driver' => env('MALWARE_DRIVER', 'fake'),
+    ],
+
 ];

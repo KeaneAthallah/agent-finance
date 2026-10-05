@@ -238,11 +238,25 @@ Status legend: ✅ done · 🚧 in progress · ⬜ not started
 - DocumentExtractionField::extraction now declares the
   real FK (document_extraction_id); Opd casts is_active
 
-### Phase 10 — Hardening ⬜
+### Phase 10 — Hardening ✅
 
-- Vitest + RTL frontend tests; Playwright E2E; security pass (rate limits,
-  headers, malware-scan hook, secrets audit); production Docker targets;
-  performance pass (indexes, pagination audit, queue tuning)
+- Vitest + RTL component tests (ui primitives, AppShell role
+  navigation — 10 tests); Playwright E2E smoke (login, dashboard,
+  rejection) with `npm run test:e2e`
+- Security pass (§35): SecurityHeaders middleware (strict CSP,
+  nosniff, DENY framing, referrer/permissions policies) on the
+  web group; login throttled 5,1 and AI chat 10,1; malware-scan
+  hook (§7) — MalwareScannerInterface with Fake/ClamAV drivers,
+  uploads scanned before persistence, infected files rejected 422
+  and never stored; secrets audit test (.env gitignored, no
+  private keys tracked)
+- Production Docker target already in place; added .dockerignore
+  build-context hygiene
+- Performance pass: composite indexes verified (documents
+  (opd_id,status)/(document_type_id,fiscal_year)/(fiscal_year,
+  created_at), reviews/validations/anomalies/audit_logs); all
+  index pages paginate (15–30/page); queue worker tuned
+  (--tries, --backoff, --timeout, --memory, --sleep)
 
 ---
 

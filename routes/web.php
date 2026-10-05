@@ -17,7 +17,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
 
-Route::middleware('guest')->group(function (): void {
+// Throttled (spec §35): credential stuffing
+// protection on the login form.
+Route::middleware(['guest', 'throttle:5,1'])->group(function (): void {
     Route::inertia('/login', 'auth/login')->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
 });
@@ -57,8 +59,9 @@ Route::middleware('auth')->group(function (): void {
 
     // AI assistant (spec §19, §20, §47): read-only, grounded
     // chat. Tools enforce OPD isolation and view policies.
+    // Throttled (spec §35): every chat turn costs tokens.
     Route::get('/ai-assistant', [AiAssistantController::class, 'index'])->name('ai.assistant');
-    Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai.assistant.chat');
+    Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai.assistant.chat')->middleware('throttle:10,1');
 
     Route::get('/activity', [ActivityController::class, 'index'])->name('activity.index');
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');

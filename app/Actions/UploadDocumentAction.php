@@ -5,9 +5,11 @@ namespace App\Actions;
 use App\Enums\DocumentStatus;
 use App\Events\DocumentUploaded;
 use App\Exceptions\DuplicateDocumentException;
+use App\Exceptions\MalwareDetectedException;
 use App\Models\Document;
 use App\Models\DocumentType;
 use App\Models\User;
+use App\Services\Security\MalwareScannerInterface;
 use App\Support\ActorType;
 use App\Support\AuditLogger;
 use Illuminate\Http\Request;
@@ -27,6 +29,7 @@ final class UploadDocumentAction
 {
     /**
      * @throws DuplicateDocumentException when the SHA-256 hash already exists
+     * @throws MalwareDetectedException when the malware scan fails (§7)
      * @throws RuntimeException when storage fails
      */
     public function execute(
@@ -35,8 +38,10 @@ final class UploadDocumentAction
         ?DocumentType $documentType,
         ?int $fiscalYear,
         ?Request $request = null,
+        ?MalwareScannerInterface $scanner = null,
     ): Document {
         $request ??= request();
+        $scanner ??= app(MalwareScannerInterface::class);
 
         $sha256 = hash_file('sha256', $file->getRealPath(), false);
 
@@ -48,6 +53,15 @@ final class UploadDocumentAction
 
         if ($existing !== null) {
             throw new DuplicateDocumentException($existing);
+        }
+
+        // Malware gate (§7): scan the temp upload before
+        // anything is persisted — an infected file never
+        // touches the documents disk.
+        if (! $scanner->isClean((string) $file->getRealPath())) {
+            throw new MalwareDetectedException(
+                $file->getClientOriginalName(),
+            );
         }
 
         $disk = (string) config('agent-finance.documents.disk', 'documents');

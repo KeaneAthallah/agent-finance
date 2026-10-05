@@ -107,6 +107,7 @@ services:
                 '--backoff=10',
                 '--timeout=600',
                 '--memory=256',
+                '--sleep=3',
             ]
         restart: unless-stopped
 

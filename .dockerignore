@@ -1,0 +1,19 @@
+# Build context hygiene: only what the image needs.
+.git
+.gitignore
+.commandcode
+.agents
+node_modules
+vendor
+storage/*
+!storage/.gitignore
+bootstrap/cache
+tests
+docs
+.phpunit.result.cache
+pint.json
+phpstan.neon
+*.md
+!README.md
+.env*
+!.env.example
