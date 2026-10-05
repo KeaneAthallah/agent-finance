@@ -76,8 +76,13 @@ final class SihandalClient implements SihandalApiInterface
     }
 
     /**
+     * Push a processed financial document to SIHANDAL as a realized
+     * expenditure (spec §48): the write path is the pengeluaran
+     * endpoint — the single write path to the system of record,
+     * always behind explicit human confirmation.
+     *
      * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
+     * @return array<string, mixed> the created SIHANDAL resource
      *
      * @throws ConnectionException when SIHANDAL is unreachable
      * @throws RequestException on API errors
@@ -90,7 +95,7 @@ final class SihandalClient implements SihandalApiInterface
             ->withToken((string) config('agent-finance.sihandal.api_key'))
             ->timeout((int) config('agent-finance.sihandal.timeout', 15))
             ->acceptJson()
-            ->post('/api/v1/documents', $payload);
+            ->post('/api/v1/pengeluaran', $payload);
 
         $response->throw();
 

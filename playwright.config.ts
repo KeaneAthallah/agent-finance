@@ -17,7 +17,11 @@ export default defineConfig({
     projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
     webServer: {
         command: 'php artisan serve --port=8000',
-        url: 'http://localhost:8000',
+        // Reachability probe only — the login route is throttled
+        // (spec §35), and this probe follows redirects, so it
+        // must not target /login or it eats the rate-limit
+        // budget the tests themselves need.
+        url: 'http://localhost:8000/health',
         reuseExistingServer: true,
         timeout: 120_000,
     },

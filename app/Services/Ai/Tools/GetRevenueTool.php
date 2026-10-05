@@ -4,6 +4,7 @@ namespace App\Services\Ai\Tools;
 
 use App\Models\User;
 use App\Services\Sihandal\SihandalApiInterface;
+use App\Services\Sihandal\TahunAnggaranService;
 
 /**
  * Revenue (penerimaan) data from the SIHANDAL
@@ -13,6 +14,7 @@ final class GetRevenueTool implements ToolInterface
 {
     public function __construct(
         private readonly SihandalApiInterface $sihandal,
+        private readonly TahunAnggaranService $tahunAnggaran,
     ) {}
 
     public function name(): string
@@ -49,8 +51,17 @@ final class GetRevenueTool implements ToolInterface
     {
         $filters = [];
 
+        // The API filters by tahun_anggaran_id — resolve
+        // the fiscal year first.
         if (isset($arguments['fiscal_year']) && is_numeric($arguments['fiscal_year'])) {
-            $filters['fiscal_year'] = (int) $arguments['fiscal_year'];
+            $tahunAnggaranId = $this->tahunAnggaran->idForYear(
+                (int) $arguments['fiscal_year'],
+                $this->sihandal,
+            );
+
+            if ($tahunAnggaranId !== null) {
+                $filters['tahun_anggaran_id'] = $tahunAnggaranId;
+            }
         }
 
         $penerimaan = $this->sihandal->penerimaan($filters)->items;

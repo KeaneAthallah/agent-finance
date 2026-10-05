@@ -14,15 +14,19 @@ use Illuminate\Database\Eloquent\Collection;
  *
  * Scoring (explainable, 0–100):
  *   +50 exact document number match
- *   +30 amount match
- *   +10 fiscal year match
- *   +10 OPD code match
+ *   +30 amount match (document amount vs belanja pagu)
+ *   +10 fiscal year match (tahun_anggaran_id)
+ *   +10 OPD match (resolved OPD id)
  * Candidates below the signal threshold are discarded as noise.
  */
 final class MatchingService
 {
     /** Minimum score for a candidate to be surfaced to a human. */
     private const MIN_CONFIDENCE = 30;
+
+    public function __construct(
+        private readonly TahunAnggaranService $tahunAnggaran,
+    ) {}
 
     /** @return array<string, mixed> */
     private function context(Document $document): array
@@ -61,12 +65,30 @@ final class MatchingService
             return new Collection;
         }
 
+        // The API filters belanja by tahun_anggaran_id (the internal
+        // year id), not by the year itself — resolve it first.
+        $tahunAnggaranId = $context['fiscal_year'] !== null
+            ? $this->tahunAnggaran->idForYear((int) $context['fiscal_year'], $sihandal)
+            : null;
+
         $belanja = $sihandal->belanja(array_filter([
-            'fiscal_year' => $context['fiscal_year'],
+            'tahun_anggaran_id' => $tahunAnggaranId,
+            // The full fiscal year is the matching universe —
+            // a single 20-row page would hide the real candidate.
+            'all' => 1,
         ]));
 
+        // Resolve the document's OPD code to the SIHANDAL OPD id
+        // (operators keep the OPD catalog aligned with SIHANDAL codes).
+        $opdId = $this->resolveOpdId($context['opd_code'], $sihandal);
+
         $candidates = collect($belanja->items)
-            ->map(fn (array $item): ?array => $this->score($item, $context))
+            ->map(fn (array $item): ?array => $this->score($item, [
+                'document_number' => $context['document_number'],
+                'amount' => $context['amount'],
+                'tahun_anggaran_id' => $tahunAnggaranId,
+                'opd_id' => $opdId,
+            ]))
             ->filter()
             ->sortByDesc(fn (array $candidate): int => $candidate['confidence'])
             ->values()
@@ -98,6 +120,24 @@ final class MatchingService
     }
 
     /**
+     * Resolve an Agent Finance OPD code to the SIHANDAL OPD id.
+     */
+    private function resolveOpdId(?string $opdCode, SihandalApiInterface $sihandal): ?int
+    {
+        if ($opdCode === null) {
+            return null;
+        }
+
+        foreach ($sihandal->opds(['all' => 1])->items as $opd) {
+            if (($opd['kode'] ?? null) === $opdCode) {
+                return (int) $opd['id'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param  array<string, mixed>  $item
      * @param  array<string, mixed>  $context
      * @return array<string, mixed>|null
@@ -114,7 +154,7 @@ final class MatchingService
             $score += 50;
         }
 
-        $itemAmount = is_numeric($item['amount'] ?? null) ? (float) $item['amount'] : null;
+        $itemAmount = is_numeric($item['pagu'] ?? null) ? (float) $item['pagu'] : null;
 
         if ($context['amount'] !== null
             && $itemAmount !== null
@@ -122,15 +162,14 @@ final class MatchingService
             $score += 30;
         }
 
-        if ($context['fiscal_year'] !== null
-            && is_numeric($item['fiscal_year'] ?? null)
-            && (int) $item['fiscal_year'] === $context['fiscal_year']) {
+        if ($context['tahun_anggaran_id'] !== null
+            && is_numeric($item['tahun_anggaran_id'] ?? null)
+            && (int) $item['tahun_anggaran_id'] === $context['tahun_anggaran_id']) {
             $score += 10;
         }
 
-        if ($context['opd_code'] !== null
-            && is_string($item['opd_code'] ?? null)
-            && $item['opd_code'] === $context['opd_code']) {
+        if ($context['opd_id'] !== null
+            && $this->itemOpdId($item) === $context['opd_id']) {
             $score += 10;
         }
 
@@ -141,8 +180,54 @@ final class MatchingService
         return [
             'entity_type' => 'belanja',
             'entity_id' => (string) ($item['id'] ?? ''),
-            'sihandal_data' => $item,
+            'sihandal_data' => $this->normalize($item),
             'confidence' => min(100, $score),
+        ];
+    }
+
+    /**
+     * The OPD a belanja line belongs to — either directly on the
+     * line or through its sub-kegiatan's kegiatan.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function itemOpdId(array $item): ?int
+    {
+        $direct = $item['opd_id'] ?? null;
+
+        if (is_numeric($direct)) {
+            return (int) $direct;
+        }
+
+        $kegiatan = $item['sub_kegiatan']['kegiatan'] ?? [];
+
+        return is_numeric($kegiatan['opd_id'] ?? null) ? (int) $kegiatan['opd_id'] : null;
+    }
+
+    /**
+     * The candidate payload kept on the match: the full SIHANDAL
+     * record plus the display fields the workspace and the sync
+     * payload read (amount from pagu, uraian, rekening kode).
+     *
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private function normalize(array $item): array
+    {
+        $rekening = is_array($item['rekening'] ?? null) ? $item['rekening'] : [];
+        $subKegiatan = is_array($item['sub_kegiatan'] ?? null) ? $item['sub_kegiatan'] : [];
+
+        $uraian = $subKegiatan['nama_sub_kegiatan'] ?? null;
+
+        if (! is_string($uraian) || $uraian === '') {
+            $uraian = $rekening['nama'] ?? null;
+        }
+
+        return [
+            ...$item,
+            'amount' => is_numeric($item['pagu'] ?? null) ? (float) $item['pagu'] : null,
+            'uraian' => $uraian,
+            'rekening' => is_string($rekening['kode'] ?? null) ? $rekening['kode'] : null,
         ];
     }
 }

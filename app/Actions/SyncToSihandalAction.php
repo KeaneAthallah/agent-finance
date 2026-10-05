@@ -56,7 +56,7 @@ final class SyncToSihandalAction
         $sync = $document->syncs()->create([
             'sihandal_match_id' => $match->id,
             'user_id' => $user->id,
-            'endpoint' => '/api/v1/documents',
+            'endpoint' => '/api/v1/pengeluaran',
             'method' => 'POST',
             'request' => $this->payload($document, $match),
             'status' => SihandalSyncStatus::Pending->value,
@@ -187,8 +187,10 @@ final class SyncToSihandalAction
     }
 
     /**
-     * The payload pushed to SIHANDAL: the confirmed financial facts
-     * from the extraction, the document identity and the OPD context.
+     * The payload pushed to SIHANDAL: the matched belanja
+     * line's full hierarchy (SIHANDAL enforces consistency
+     * across these ids), the realized amount and the document
+     * identity for traceability.
      *
      * @return array<string, mixed>
      */
@@ -201,17 +203,24 @@ final class SyncToSihandalAction
 
         $candidate = $match->sihandal_data;
 
+        $subKegiatan = is_array($candidate['sub_kegiatan'] ?? null) ? $candidate['sub_kegiatan'] : [];
+
+        $amount = $document->metadata['extracted_amount'] ?? $document->metadata['extracted_total_budget'] ?? null;
+
         return array_filter([
+            'opd_id' => $candidate['opd_id'] ?? null,
+            'kegiatan_id' => $subKegiatan['kegiatan_id'] ?? null,
+            'sub_kegiatan_id' => $candidate['sub_kegiatan_id'] ?? $subKegiatan['id'] ?? null,
+            'belanja_id' => $candidate['id'] ?? null,
+            'rekening_id' => $candidate['rekening_id'] ?? null,
+            'sumber_dana_id' => $candidate['sumber_dana_id'] ?? null,
+            'tahun_anggaran_id' => $candidate['tahun_anggaran_id'] ?? null,
+            'realisasi' => is_numeric($amount) ? (float) $amount : null,
+            'tanggal' => is_string($payload['document_date'] ?? null) ? $payload['document_date'] : null,
+            'keterangan' => $document->document_number ?? $document->original_filename,
             'document_number' => $document->document_number,
-            'document_type' => $document->documentType?->code,
-            'fiscal_year' => $document->fiscal_year,
-            'amount' => $document->metadata['extracted_amount'] ?? $document->metadata['extracted_total_budget'] ?? null,
-            'opd_code' => $document->opd?->code,
             'source_document_id' => $document->id,
             'agent_finance_file' => $document->original_filename,
-            'sihandal_belanja_id' => $candidate['id'] ?? null,
-            'sihandal_rekening' => $candidate['rekening'] ?? null,
-            'sihandal_uraian' => $candidate['uraian'] ?? null,
             'matched_at' => $match->created_at->toIso8601String(),
         ], static fn ($value): bool => $value !== null);
     }

@@ -13,9 +13,16 @@ use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SihandalController;
 use App\Http\Controllers\SihandalMatchController;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
+
+// Lightweight reachability probe for the E2E
+// webServer check and container health checks —
+// no auth, no throttle (spec §35), so it never
+// eats the login route's rate-limit budget.
+Route::get('/health', fn (): JsonResponse => response()->json(['status' => 'ok']));
 
 // Throttled (spec §35): credential stuffing
 // protection on the login form.

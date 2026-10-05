@@ -14,6 +14,7 @@ use App\Models\SihandalMatch;
 use App\Models\User;
 use App\Services\Sihandal\MatchingService;
 use App\Services\Sihandal\SihandalApiInterface;
+use App\Support\SihandalCollection;
 use Database\Seeders\AgentFinanceSeeder;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -53,6 +54,7 @@ function sihandalReadyDocument(): Document
             'document_number' => 'SPM-777/2026',
             'fiscal_year' => 2026,
             'status' => DocumentStatus::Approved,
+            'metadata' => ['extracted_amount' => 125000000],
         ]);
 
     $document->extractions()->create([
@@ -87,11 +89,20 @@ function pendingMatch(Document $document, int $confidence = 100): SihandalMatch
         'entity_id' => '1001',
         'sihandal_data' => [
             'id' => 1001,
+            'opd_id' => 1,
+            'sub_kegiatan_id' => 1,
+            'rekening_id' => 1,
+            'sumber_dana_id' => 1,
+            'tahun_anggaran_id' => 2,
+            'pagu' => 125000000,
+            'document_number' => 'SPM-777/2026',
             'rekening' => '5.1.02.01.0001',
             'uraian' => 'Belanja Bahan Habis Pakai',
             'amount' => 125000000,
-            'fiscal_year' => 2026,
-            'document_number' => 'SPM-777/2026',
+            'sub_kegiatan' => [
+                'id' => 1,
+                'kegiatan_id' => 1,
+            ],
         ],
         'confidence' => $confidence,
         'status' => SihandalMatchStatus::Pending->value,
@@ -162,6 +173,7 @@ it('is failure-safe when SIHANDAL is unreachable (spec §50)', function () {
     $document = sihandalReadyDocument();
 
     $sihandal = Mockery::mock(SihandalApiInterface::class);
+    $sihandal->shouldReceive('tahunAnggaran')->andReturn(new SihandalCollection(items: []));
     $sihandal->shouldReceive('belanja')->andThrow(new ConnectionException('unreachable'));
 
     (new MatchSihandalDataJob($document->id, 1))->handle(
@@ -222,9 +234,13 @@ it('syncs an approved document to SIHANDAL on confirm', function () {
         ->and($document->refresh()->status)->toBe(DocumentStatus::Synced)
         ->and($document->synced_at)->not->toBeNull()
         ->and($sync->status)->toBe(SihandalSyncStatus::Success)
-        ->and($sync->endpoint)->toBe('/api/v1/documents')
+        ->and($sync->endpoint)->toBe('/api/v1/pengeluaran')
         ->and($sync->http_status)->toBe(201)
         ->and($sync->request['document_number'])->toBe('SPM-777/2026')
+        ->and($sync->request['belanja_id'])->toBe(1001)
+        ->and($sync->request['rekening_id'])->toBe(1)
+        ->and($sync->request['tahun_anggaran_id'])->toBe(2)
+        ->and($sync->request['realisasi'])->toBe(125000000)
         ->and($sync->response['status'])->toBe('recorded')
         ->and(AuditLog::query()->where('action', 'document.synced')->where('actor_type', 'human')->exists())->toBeTrue();
 });
