@@ -27,6 +27,7 @@ final class GetSihandalDataTool implements ToolInterface
         'sumber_dana',
         'penerimaan',
         'pengeluaran',
+        'tahun_anggaran',
     ];
 
     /** Resources whose rows belong to a fiscal year. */
@@ -47,7 +48,7 @@ final class GetSihandalDataTool implements ToolInterface
 
     public function description(): string
     {
-        return 'List data from the SIHANDAL system of record. Resources: opds, programs, kegiatan, sub_kegiatan, belanja, rekenings, sumber_dana, penerimaan (revenue realizations), pengeluaran (expenditure). Kegiatan, sub_kegiatan, belanja, penerimaan and pengeluaran are fiscal-year scoped; kegiatan, belanja, penerimaan and pengeluaran can also be filtered by opd_id; every resource accepts search. Results are paginated, at most 100 rows per page.';
+        return 'List data from the SIHANDAL system of record. Resources: opds, programs, kegiatan, sub_kegiatan, belanja, rekenings, sumber_dana, penerimaan (revenue realizations), pengeluaran (expenditure), tahun_anggaran (the fiscal years SIHANDAL covers). Kegiatan, sub_kegiatan, belanja, penerimaan and pengeluaran are fiscal-year scoped; kegiatan, belanja, penerimaan and pengeluaran can also be filtered by opd_id; every resource accepts search. Search matches full names, not acronyms — an empty search does not mean the data is absent. Results are paginated, at most 100 rows per page.';
     }
 
     /**
@@ -73,7 +74,7 @@ final class GetSihandalDataTool implements ToolInterface
                 ],
                 'search' => [
                     'type' => 'string',
-                    'description' => 'Keyword filter, matched by SIHANDAL',
+                    'description' => 'Keyword filter, matched by SIHANDAL against full names — acronyms often do not match',
                 ],
                 'page' => [
                     'type' => 'integer',
@@ -152,6 +153,7 @@ final class GetSihandalDataTool implements ToolInterface
             'sumber_dana' => $this->sihandal->sumberDana($filters),
             'penerimaan' => $this->sihandal->penerimaan($filters),
             'pengeluaran' => $this->sihandal->pengeluaran($filters),
+            'tahun_anggaran' => $this->sihandal->tahunAnggaran($filters),
         };
 
         return [

@@ -11,7 +11,7 @@ it('lists every SIHANDAL resource', function () {
     $tool = new GetSihandalDataTool(new FakeSihandalClient, new TahunAnggaranService);
     $user = new User;
 
-    foreach (['opds', 'programs', 'kegiatan', 'sub_kegiatan', 'belanja', 'rekenings', 'sumber_dana', 'penerimaan', 'pengeluaran'] as $resource) {
+    foreach (['opds', 'programs', 'kegiatan', 'sub_kegiatan', 'belanja', 'rekenings', 'sumber_dana', 'penerimaan', 'pengeluaran', 'tahun_anggaran'] as $resource) {
         $result = $tool->execute(['resource' => $resource], $user);
 
         expect($result['resource'])->toBe($resource)

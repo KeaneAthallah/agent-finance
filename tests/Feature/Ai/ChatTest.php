@@ -234,6 +234,72 @@ it('warns for a fiscal year SIHANDAL does not have', function () {
         ->and(str()->contains($spoken, '2024'))->toBeTrue();
 });
 
+it('chains tool rounds until the model can answer', function () {
+    $this->seed(AgentFinanceSeeder::class);
+
+    // The first (empty) search must be followed by a wider
+    // query before the model can answer — the assistant
+    // chains tool rounds instead of dropping the call.
+    app()->instance(AIProviderInterface::class, new class implements AIProviderInterface
+    {
+        public function analyzeDocument(AiDocumentRequest $request): AiDocumentResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function extractStructuredData(AiExtractionRequest $request): AiExtractionResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function generateEmbedding(string $text, string $model): AiEmbeddingResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function chat(AiChatRequest $request): AiChatResult
+        {
+            $toolMessages = collect($request->messages)->where('role', 'tool');
+
+            if ($toolMessages->isEmpty()) {
+                return new AiChatResult(
+                    content: '',
+                    toolCalls: [['name' => 'get_sihandal_data', 'arguments' => ['resource' => 'opds', 'search' => 'bappeda']]],
+                    meta: ['provider' => 'stub'],
+                );
+            }
+
+            if ($toolMessages->count() === 1) {
+                return new AiChatResult(
+                    content: '',
+                    toolCalls: [['name' => 'get_sihandal_data', 'arguments' => ['resource' => 'opds', 'per_page' => 100]]],
+                    meta: ['provider' => 'stub'],
+                );
+            }
+
+            return new AiChatResult(
+                content: json_encode([
+                    'summary' => 'Bappeda ditemukan.',
+                    'statements' => [
+                        ['label' => 'FACT', 'text' => 'Badan Perencanaan Pembangunan Daerah ada dalam daftar OPD.', 'source' => 'get_sihandal_data'],
+                    ],
+                ]),
+                meta: ['provider' => 'stub'],
+            );
+        }
+    });
+
+    actingAs(aiOpdUser());
+
+    $response = json_decode(post('/ai-assistant/chat', [
+        'question' => 'OPD bappeda?',
+    ], ['Accept' => 'application/json'])->getContent(), true);
+
+    expect($response['tool_calls'])->toHaveCount(2)
+        ->and($response['summary'])->toBe('Bappeda ditemukan.')
+        ->and(collect($response['statements'])->firstWhere('label', 'FACT'))->not->toBeNull();
+});
+
 it('parses answers the model wraps in code fences', function () {
     $this->seed(AgentFinanceSeeder::class);
 

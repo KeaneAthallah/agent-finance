@@ -187,7 +187,8 @@ Status legend: ✅ done · 🚧 in progress · ⬜ not started
   `compare_document_with_sihandal`, `get_sihandal_data`
   — all SIHANDAL list resources: opds, programs,
   kegiatan, sub_kegiatan, belanja, rekenings,
-  sumber_dana, penerimaan, pengeluaran —,
+  sumber_dana, penerimaan, pengeluaran,
+  tahun_anggaran —,
   `validate_document`) — read-only, OPD-scoped
 - Chat page with FACT/CALCULATION/AI INTERPRETATION/WARNING labels;
   tool errors surface as WARNING, never leak out-of-scope IDs

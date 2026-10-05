@@ -18,6 +18,13 @@ use Throwable;
  */
 final class ChatService
 {
+    /**
+     * The model may chain tool rounds — an empty search
+     * followed by a wider query, a fiscal-year lookup
+     * before the data query — before it can answer.
+     */
+    private const MAX_TOOL_ROUNDS = 5;
+
     public function __construct(
         private readonly AIProviderInterface $ai,
         private readonly ToolRegistry $tools,
@@ -49,24 +56,26 @@ final class ChatService
                 [['role' => 'user', 'content' => $question]],
             );
 
-            $toolCalls = [];
-
             // Round 1: the provider decides whether it needs tools.
             $result = $this->ai->chat(new AiChatRequest(
                 messages: $messages,
                 tools: $this->tools->definitions(),
             ));
 
-            $toolCalls = $result->toolCalls;
+            $toolCalls = [];
+            $inputTokens = (int) ($result->meta['input_tokens'] ?? 0);
+            $outputTokens = (int) ($result->meta['output_tokens'] ?? 0);
 
-            // Round 2 (only when tools were called): execute them
-            // and ask again with the results in context.
-            if ($toolCalls !== []) {
+            // Each round executes its calls and asks again, tools
+            // included, until the model answers without calling
+            // tools or the chain reaches its bound.
+            for ($round = 1; $round <= self::MAX_TOOL_ROUNDS && $result->toolCalls !== []; $round++) {
                 $executed = [];
 
-                foreach ($toolCalls as $call) {
+                foreach ($result->toolCalls as $call) {
                     $name = (string) $call['name'];
                     $arguments = $call['arguments'];
+                    $toolCalls[] = $call;
 
                     try {
                         $executed[] = [
@@ -91,7 +100,7 @@ final class ChatService
 
                 $messages[] = [
                     'role' => 'assistant',
-                    'content' => json_encode(['tool_calls' => $toolCalls], JSON_THROW_ON_ERROR),
+                    'content' => json_encode(['tool_calls' => $result->toolCalls], JSON_THROW_ON_ERROR),
                 ];
 
                 foreach ($executed as $toolResult) {
@@ -101,15 +110,21 @@ final class ChatService
                     ];
                 }
 
-                $result = $this->ai->chat(new AiChatRequest($messages));
+                $result = $this->ai->chat(new AiChatRequest(
+                    messages: $messages,
+                    tools: $this->tools->definitions(),
+                ));
+
+                $inputTokens += (int) ($result->meta['input_tokens'] ?? 0);
+                $outputTokens += (int) ($result->meta['output_tokens'] ?? 0);
             }
 
             $answer = $this->parseAnswer($result->content);
 
             $run->update([
                 'status' => 'completed',
-                'input_tokens' => isset($result->meta['input_tokens']) ? (int) $result->meta['input_tokens'] : null,
-                'output_tokens' => isset($result->meta['output_tokens']) ? (int) $result->meta['output_tokens'] : null,
+                'input_tokens' => $inputTokens > 0 ? $inputTokens : null,
+                'output_tokens' => $outputTokens > 0 ? $outputTokens : null,
                 'duration_ms' => $startedAt->diffInMilliseconds(now()),
                 'meta' => array_merge($result->meta, ['tools_called' => $toolCalls]),
             ]);
@@ -118,8 +133,8 @@ final class ChatService
                 'ai_run_id' => $run->id,
                 'provider' => $run->provider,
                 'model' => $run->model,
-                'input_tokens' => (int) ($result->meta['input_tokens'] ?? 0),
-                'output_tokens' => (int) ($result->meta['output_tokens'] ?? 0),
+                'input_tokens' => $inputTokens,
+                'output_tokens' => $outputTokens,
                 'duration_ms' => $run->duration_ms,
             ]);
 
@@ -157,6 +172,12 @@ final class ChatService
             .'documents uploaded to Agent Finance, never SIHANDAL. The word '
             .'"sihandal" in a question names the system — it is never a data '
             .'category, name, or search keyword. '
+            .'If a search returns no rows, the term may be an acronym or '
+            .'partial name — query the resource again without search '
+            .'(per_page=100) and scan the rows yourself before concluding '
+            .'the data does not exist. When a fiscal year is unavailable, '
+            .'query the tahun_anggaran resource and state which fiscal '
+            .'years SIHANDAL does cover. '
             .'Ground every answer in the tool results provided — financial numbers only '
             .'ever come from tool results, never from your own knowledge. '
             ."Label every statement exactly one of:\n"
