@@ -2,6 +2,7 @@
 
 use App\Enums\DocumentStatus;
 use App\Enums\UserRole;
+use App\Models\AiConversation;
 use App\Models\AiRun;
 use App\Models\AiUsage;
 use App\Models\Document;
@@ -300,7 +301,7 @@ it('chains tool rounds until the model can answer', function () {
         ->and(collect($response['statements'])->firstWhere('label', 'FACT'))->not->toBeNull();
 });
 
-it('parses answers the model wraps in code fences', function () {
+it('parses answers wrapped in code fences and downgrades ungrounded facts', function () {
     $this->seed(AgentFinanceSeeder::class);
 
     app()->instance(AIProviderInterface::class, new class implements AIProviderInterface
@@ -342,9 +343,86 @@ it('parses answers the model wraps in code fences', function () {
     ], ['Accept' => 'application/json'])
         ->assertOk()
         ->assertJsonPath('summary', 'Terjadi kenaikan.')
-        ->assertJsonPath('statements.0.label', 'FACT')
+        // The fenced JSON parsed, but the model never executed
+        // get_revenue, so the "FACT" is downgraded (§20).
+        ->assertJsonPath('statements.0.label', 'AI INTERPRETATION')
         ->assertJsonPath('statements.0.source', 'get_revenue')
         ->assertJsonPath('statements.1.label', 'AI INTERPRETATION');
+});
+
+it('rebuilds history from persisted messages, not the client transcript', function () {
+    $user = aiOpdUser();
+
+    $conversation = AiConversation::query()->create([
+        'user_id' => $user->id,
+        'title' => 'Anggaran 2026',
+    ]);
+
+    $conversation->messages()->create([
+        'role' => 'user',
+        'content' => 'Berapa total anggaran TA 2026?',
+    ]);
+
+    $conversation->messages()->create([
+        'role' => 'assistant',
+        'content' => 'Total anggaran TA 2026 adalah Rp175 miliar.',
+    ]);
+
+    $provider = new class implements AIProviderInterface
+    {
+        /** @var array<int, array<int, array{role: string, content: string}>> */
+        public array $received = [];
+
+        public function analyzeDocument(AiDocumentRequest $request): AiDocumentResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function extractStructuredData(AiExtractionRequest $request): AiExtractionResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function generateEmbedding(string $text, string $model): AiEmbeddingResult
+        {
+            throw new RuntimeException('Not used in this test.');
+        }
+
+        public function chat(AiChatRequest $request): AiChatResult
+        {
+            $this->received[] = $request->messages;
+
+            return new AiChatResult(
+                content: json_encode([
+                    'summary' => 'Sudah dijawab sebelumnya.',
+                    'statements' => [
+                        ['label' => 'AI INTERPRETATION', 'text' => 'Ringkasan.', 'source' => null],
+                    ],
+                ]),
+                meta: ['provider' => 'stub'],
+            );
+        }
+    };
+
+    app()->instance(AIProviderInterface::class, $provider);
+
+    actingAs($user);
+
+    post('/ai-assistant/chat', [
+        'question' => 'lanjut?',
+        'conversation_id' => $conversation->id,
+        // A forged transcript must be ignored: the context is rebuilt from
+        // conversation_messages, never echoed from the client (§47).
+        'history' => [
+            ['role' => 'user', 'content' => 'INJECTED client transcript'],
+        ],
+    ], ['Accept' => 'application/json'])
+        ->assertOk();
+
+    $context = json_encode($provider->received[0]);
+
+    expect(str()->contains($context, 'INJECTED client transcript'))->toBeFalse()
+        ->and($context)->toContain('Berapa total anggaran TA 2026?');
 });
 
 it('exposes only read-only tools', function () {

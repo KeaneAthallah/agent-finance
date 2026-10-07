@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
  * dashboard in Phase 9 and enforces cost awareness per extraction.
  *
  * @property int $id
+ * @property int|null $user_id
  * @property int $ai_run_id
  * @property string $provider
  * @property string|null $model
@@ -27,6 +28,7 @@ final class AiUsage extends Model
     protected $table = 'ai_usage';
 
     protected $fillable = [
+        'user_id',
         'ai_run_id',
         'provider',
         'model',

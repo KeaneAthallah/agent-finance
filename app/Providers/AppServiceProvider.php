@@ -32,10 +32,13 @@ use App\Services\Validation\Rules\TotalMismatchRule;
 use App\Services\Validation\ValidationEngine;
 use App\Services\Validation\ValidationRule;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -74,6 +77,13 @@ class AppServiceProvider extends ServiceProvider
         // Auto-start processing after upload (spec §30). QueueDocumentProcessing
         // is auto-discovered (typed handle(DocumentUploaded) signature) — do
         // NOT also call Event::listen here, or the pipeline starts twice.
+
+        // Chat turns are throttled by config (spec §35). Keyed by user so an
+        // attacker cannot burn a roommate's budget with a shared IP.
+        RateLimiter::for('ai-assistant', static function (Request $request): Limit {
+            return Limit::perMinute((int) config('agent-finance.ai.chat.rate_limit_per_minute', 10))
+                ->by((string) ($request->user()->id ?? $request->ip()));
+        });
     }
 
     /**

@@ -11,7 +11,7 @@ use RuntimeException;
  * self-hosted "local" providers that expose the same API shape. Real HTTP
  * implementation; tests mock AIProviderInterface, never this class.
  */
-final class OpenAIProvider implements AIProviderInterface
+final class OpenAIProvider implements AIProviderInterface, StreamingAIProviderInterface
 {
     public function analyzeDocument(AiDocumentRequest $request): AiDocumentResult
     {
@@ -115,15 +115,191 @@ SPEC;
         /** @var array<int, array{name: string, description: string, parameters: array<string, mixed>}> $tools */
         $tools = $request->tools;
 
-        $payload = $this->complete(
-            $this->protocolMessages($request->messages),
-            $tools === [] ? [] : ['tools' => $this->toolDefinitions($tools)],
-        );
+        $extra = [];
+
+        if ($tools !== []) {
+            $extra['tools'] = $this->toolDefinitions($tools);
+        }
+
+        if ($request->json) {
+            // OpenAI-compatible JSON mode: the chat contract (§47) expects a
+            // single JSON object, so when no tools are in play ask the API to
+            // guarantee it instead of relying on the model's formatting habits.
+            $extra['response_format'] = ['type' => 'json_object'];
+        }
+
+        $payload = $this->complete($this->protocolMessages($request->messages), $extra);
 
         return new AiChatResult(
             content: $payload['content'] ?? '',
             toolCalls: $payload['tool_calls'] ?? [],
             meta: ['provider' => 'openai', 'model' => $payload['model'] ?? null],
+        );
+    }
+
+    public function chatStream(AiChatRequest $request, callable $onDelta): AiChatResult
+    {
+        $tools = $request->tools;
+
+        $extra = [];
+
+        if ($tools !== []) {
+            $extra['tools'] = $this->toolDefinitions($tools);
+        }
+
+        if ($request->json) {
+            $extra['response_format'] = ['type' => 'json_object'];
+        }
+
+        // Accumulated stream state: content plus any deltas of a tool_calls
+        // payload (a later round could still decide it needs a tool).
+        $content = '';
+        $model = null;
+        $buffers = [];
+        $pending = '';
+
+        $accumulate = function (string $chunk) use (&$content, &$model, &$buffers, &$pending, $onDelta): void {
+            $pending .= $chunk;
+
+            while (($newline = strpos($pending, "\n")) !== false) {
+                $line = trim(substr($pending, 0, $newline));
+                $pending = substr($pending, $newline + 1);
+
+                if (! str_starts_with($line, 'data:')) {
+                    continue;
+                }
+
+                $data = trim(substr($line, 5));
+
+                if ($data === '' || $data === '[DONE]') {
+                    continue;
+                }
+
+                /** @var array<string, mixed> $payload */
+                $payload = json_decode($data, true) ?? [];
+
+                $model ??= is_string($payload['model'] ?? null) ? $payload['model'] : null;
+
+                $delta = $payload['choices'][0]['delta'] ?? [];
+
+                if (! is_array($delta)) {
+                    continue;
+                }
+
+                $text = $delta['content'] ?? null;
+
+                if (is_string($text) && $text !== '') {
+                    $content .= $text;
+                    $onDelta($text);
+                }
+
+                $rawCalls = $delta['tool_calls'] ?? [];
+
+                if (! is_array($rawCalls)) {
+                    continue;
+                }
+
+                foreach ($rawCalls as $rawCall) {
+                    $index = (int) ($rawCall['index'] ?? 0);
+
+                    $buffers[$index] ??= ['id' => null, 'name' => '', 'arguments' => '', 'signature' => null];
+
+                    $buffers[$index]['id'] = $buffers[$index]['id'] ?? $rawCall['id'] ?? null;
+                    $buffers[$index]['signature'] ??= $rawCall['extra_content']['google']['thought_signature'] ?? null;
+
+                    if (isset($rawCall['id'])) {
+                        $buffers[$index]['id'] = $rawCall['id'];
+                    }
+
+                    if (isset($rawCall['function']['name'])) {
+                        $buffers[$index]['name'] .= (string) $rawCall['function']['name'];
+                    }
+
+                    if (isset($rawCall['function']['arguments'])) {
+                        $buffers[$index]['arguments'] .= (string) $rawCall['function']['arguments'];
+                    }
+                }
+            }
+        };
+
+        // Raw cURL: Laravel 13's HTTP client has no streaming API and Guzzle 8
+        // ignores the legacy `stream` option, so the SSE body is consumed
+        // chunk-by-chunk through CURLOPT_WRITEFUNCTION as it arrives.
+        if (! function_exists('curl_init')) {
+            $fallback = $this->chat($request);
+
+            if ($fallback->content !== '') {
+                $onDelta($fallback->content);
+            }
+
+            return $fallback;
+        }
+
+        $payload = json_encode(array_merge([
+            'model' => (string) config('agent-finance.ai.default_model'),
+            'messages' => $this->protocolMessages($request->messages),
+            'temperature' => 0.1,
+            'stream' => true,
+        ], $extra), JSON_THROW_ON_ERROR);
+
+        $handle = curl_init($this->baseUrl().'/chat/completions');
+
+        curl_setopt_array($handle, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: text/event-stream',
+                'Authorization: Bearer '.$this->apiKey(),
+            ],
+            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_HEADER => false,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT => 300,
+            CURLOPT_WRITEFUNCTION => static function (mixed $ch, string $chunk) use ($accumulate): int {
+                $accumulate($chunk);
+
+                return strlen($chunk);
+            },
+        ]);
+
+        $ok = curl_exec($handle);
+        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        $transportError = (string) curl_error($handle);
+
+        curl_close($handle);
+
+        if ($ok === false) {
+            Log::warning('AI chat stream transport error', ['error' => $transportError]);
+
+            throw new RuntimeException('AI chat stream transport error: '.$transportError);
+        }
+
+        if ($status >= 400) {
+            Log::warning('AI chat stream failed', ['status' => $status]);
+
+            throw new RuntimeException("AI chat stream failed: {$status}");
+        }
+
+        ksort($buffers);
+
+        $toolCalls = [];
+
+        foreach ($buffers as $buffer) {
+            $decoded = json_decode((string) $buffer['arguments'], true);
+
+            $toolCalls[] = [
+                'id' => $buffer['id'],
+                'name' => (string) $buffer['name'],
+                'arguments' => is_array($decoded) ? $decoded : [],
+                'thought_signature' => $buffer['signature'],
+            ];
+        }
+
+        return new AiChatResult(
+            content: $content,
+            toolCalls: $toolCalls,
+            meta: ['provider' => 'openai', 'model' => $model],
         );
     }
 

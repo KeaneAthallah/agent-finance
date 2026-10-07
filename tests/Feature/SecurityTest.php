@@ -83,7 +83,8 @@ it('throttles the login form and the AI chat', function () {
     \assert($chat instanceof Illuminate\Routing\Route);
 
     expect($login->gatherMiddleware())->toContain('throttle:5,1')
-        ->and($chat->gatherMiddleware())->toContain('throttle:10,1');
+        // Chat throttling is config-driven via the named limiter (§35).
+        ->and($chat->gatherMiddleware())->toContain('throttle:ai-assistant');
 });
 
 it('binds the malware scanner from configuration', function () {

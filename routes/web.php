@@ -68,7 +68,11 @@ Route::middleware('auth')->group(function (): void {
     // chat. Tools enforce OPD isolation and view policies.
     // Throttled (spec §35): every chat turn costs tokens.
     Route::get('/ai-assistant', [AiAssistantController::class, 'index'])->name('ai.assistant');
-    Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai.assistant.chat')->middleware('throttle:10,1');
+    Route::post('/ai-assistant/chat', [AiAssistantController::class, 'chat'])->name('ai.assistant.chat')->middleware('throttle:ai-assistant');
+    Route::post('/ai-assistant/chat/stream', [AiAssistantController::class, 'stream'])->name('ai.assistant.chat.stream')->middleware('throttle:ai-assistant');
+    Route::get('/ai-assistant/conversations/{conversation}/messages', [AiAssistantController::class, 'messages'])->name('ai.assistant.conversations.messages')->whereNumber('conversation');
+    Route::patch('/ai-assistant/conversations/{conversation}', [AiAssistantController::class, 'rename'])->name('ai.assistant.conversations.rename')->whereNumber('conversation');
+    Route::delete('/ai-assistant/conversations/{conversation}', [AiAssistantController::class, 'destroy'])->name('ai.assistant.conversations.destroy')->whereNumber('conversation');
 
     Route::get('/activity', [ActivityController::class, 'index'])->name('activity.index');
     Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');

@@ -14,5 +14,6 @@ final class AiChatRequest
     public function __construct(
         public readonly array $messages,
         public readonly array $tools = [],
+        public readonly bool $json = false,
     ) {}
 }

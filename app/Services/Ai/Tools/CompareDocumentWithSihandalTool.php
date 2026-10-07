@@ -92,6 +92,7 @@ final class CompareDocumentWithSihandalTool implements ToolInterface
             'document_number' => $document->document_number,
             'extraction' => $facts,
             'candidates' => $comparison->all(),
+            'refs' => [['type' => 'document', 'id' => $document->id]],
         ];
     }
 }

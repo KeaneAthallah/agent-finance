@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
  * Deterministic fake provider used in tests and when no real provider is
  * configured. It never performs network calls (spec §53, §54).
  */
-final class FakeAIProvider implements AIProviderInterface
+final class FakeAIProvider implements AIProviderInterface, StreamingAIProviderInterface
 {
     public function analyzeDocument(AiDocumentRequest $request): AiDocumentResult
     {
@@ -121,6 +121,27 @@ final class FakeAIProvider implements AIProviderInterface
     }
 
     public function chat(AiChatRequest $request): AiChatResult
+    {
+        return $this->answer($request);
+    }
+
+    public function chatStream(AiChatRequest $request, callable $onDelta): AiChatResult
+    {
+        $result = $this->answer($request);
+
+        // Deterministic streaming: the final content is pushed in small
+        // slices so SSE consumers see text appear progressively (§44).
+        foreach (str_split($result->content, 8) as $slice) {
+            $onDelta($slice);
+        }
+
+        return $result;
+    }
+
+    /**
+     * The deterministic "model" behind chat() and chatStream().
+     */
+    private function answer(AiChatRequest $request): AiChatResult
     {
         $messages = collect($request->messages);
         $last = $messages->last()['content'] ?? '';

@@ -8,7 +8,8 @@
         "dev": "vp dev",
         "check": "vp check",
         "check:fix": "vp check --fix",
-        "types:check": "tsc --noEmit"
+        "types:check": "tsc --noEmit",
+        "test:front": "vitest run"
     },
     "dependencies": {
         "@inertiajs/react": "^3.0.0",
@@ -22,6 +23,8 @@
         "laravel-vite-plugin": "^3.1",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
+        "react-markdown": "^10.1.0",
+        "remark-gfm": "^4.0.1",
         "tailwind-merge": "^3.0.1",
         "tailwindcss": "^4.0.0",
         "typescript": "^5.7.2",

@@ -41,6 +41,18 @@ return [
                 'base_url' => env('LOCAL_AI_BASE_URL'),
             ],
         ],
+        'chat' => [
+            // Per-user daily guardrails (roadmap P0-2). The token budget reads
+            // ai_usage rows for the current user/day; the message limit counts
+            // persisted conversation turns. Both default high enough for real
+            // work while acting as a cost ceiling.
+            'rate_limit_per_minute' => (int) env('AI_CHAT_RATE_LIMIT_PER_MINUTE', 10),
+            'daily_message_limit' => (int) env('AI_CHAT_DAILY_MESSAGE_LIMIT', 100),
+            'daily_token_budget' => (int) env('AI_CHAT_DAILY_TOKEN_BUDGET', 200_000),
+            // Re-ask once with a JSON-only repair instruction when the model
+            // answers in prose instead of the labeled-statement contract (§47).
+            'json_retry' => (bool) env('AI_CHAT_JSON_RETRY', true),
+        ],
     ],
 
     /*

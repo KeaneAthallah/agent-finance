@@ -74,6 +74,7 @@ final class ValidateDocumentTool implements ToolInterface
                 'version' => $validation->version,
             ] : null,
             'open_anomalies' => $anomalies->all(),
+            'refs' => [['type' => 'document', 'id' => $document->id]],
         ];
     }
 }

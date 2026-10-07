@@ -73,10 +73,18 @@ final class SearchDocumentsTool implements ToolInterface
 
         $hits = $this->search->search($query, $user, $fiscalYear, $documentType, 10);
 
+        // Unique document-level citations for the answer UI (roadmap P1-1).
+        $refs = [];
+
+        foreach ($hits as $hit) {
+            $refs[$hit['document_id']] = ['type' => 'document', 'id' => $hit['document_id']];
+        }
+
         return [
             'query' => $query,
             'hit_count' => $hits->count(),
             'hits' => $hits->all(),
+            'refs' => array_values($refs),
         ];
     }
 }
