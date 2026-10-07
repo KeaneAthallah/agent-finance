@@ -58,7 +58,13 @@ class ReviewController extends Controller
             ->all();
 
         return Inertia::render('review/index', [
-            'documents' => DocumentResource::collection($documents),
+            'documents' => [
+                'data' => DocumentResource::collection($documents->getCollection())->resolve($request),
+                'current_page' => $documents->currentPage(),
+                'last_page' => $documents->lastPage(),
+                'total' => $documents->total(),
+                'links' => $documents->linkCollection()->all(),
+            ],
             'openAnomalies' => $openAnomalies,
             'worstSeverities' => $severities->all(),
             'can' => [

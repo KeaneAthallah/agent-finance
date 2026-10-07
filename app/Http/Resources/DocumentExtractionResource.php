@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\DocumentExtraction;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -25,8 +26,11 @@ class DocumentExtractionResource extends JsonResource
             'confidence' => $this->confidence,
             'error' => $this->error,
             'payload' => $this->payload,
-            'fields' => DocumentExtractionFieldResource::collection(
-                $this->whenLoaded('fields'),
+            // Resolved here: Inertia wraps nested resources in a {"data": ...} envelope.
+            'fields' => $this->whenLoaded(
+                'fields',
+                fn (EloquentCollection $fields): array => DocumentExtractionFieldResource::collection($fields)->resolve($request),
+                [],
             ),
             'ai_run' => $this->whenLoaded('run', fn () => $this->run !== null ? [
                 'id' => $this->run->id,

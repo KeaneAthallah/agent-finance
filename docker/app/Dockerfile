@@ -1,7 +1,9 @@
 # Dev stage: PHP-FPM + Composer + Node + common PHP extensions.
 # The scheduler/queue/nginx services share this image.
+# PHP must satisfy composer.lock as installed on the host (vendor/ is mounted),
+# so this tracks the host's PHP major.minor.
 
-FROM php:8.3-fpm AS base
+FROM php:8.5-fpm AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
@@ -19,7 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr-ind \
         tesseract-ocr-eng \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd pdo_mysql bcmath zip \
+    && docker-php-ext-install -j$(nproc) gd pdo_mysql bcmath zip pcntl \
+    && printf '\n' | pecl install redis \
+    && docker-php-ext-enable redis \
     && rm -rf /var/lib/apt/lists/*
 
 # Large document uploads: raise PHP's body and memory limits
@@ -29,9 +33,16 @@ RUN printf 'upload_max_filesize=128M\npost_max_size=128M\nmemory_limit=512M\n' >
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Node 22 for the frontend build (used by `php artisan dev` flows too).
-COPY --from=node:22-alpine /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22-alpine /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
-ENV PATH="/usr/local/lib/node_modules/npm/bin:/usr/local/bin:${PATH}"
+# Must be the Debian (glibc) build matching this image's distro — the alpine
+# binary is musl-linked and will not execute here. npm/npx are linked from
+# /usr/local/bin as in the official node image; without those symlinks `npm`
+# resolves to the libexec shell shim, which looks for npm under
+# dirname(process.execPath) and fails.
+COPY --from=node:22-trixie-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-trixie-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+ENV PATH="/usr/local/bin:${PATH}"
 
 WORKDIR /var/www
 

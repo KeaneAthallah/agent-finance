@@ -41,13 +41,19 @@ final class SecurityHeaders
      * the Vite dev server on arbitrary loopback hosts and
      * ports — including IPv6 [::1], for which CSP has no
      * portable any-port wildcard — so dev gets a permissive
-     * script/style/font policy. Framing, base URIs and
-     * form targets stay locked down in every environment.
+     * script/style/font policy. `blob:` is allowed in
+     * script-src/worker-src because the Vite client creates
+     * its HMR health-check worker from a blob: URL; without
+     * it the worker is blocked, the client reports a lost
+     * server connection and misses optimizer full-reloads
+     * (leaving the module graph with mixed dep hashes).
+     * Framing, base URIs and form targets stay locked down
+     * in every environment.
      */
     private function contentSecurityPolicy(): string
     {
         if (app()->environment('local')) {
-            return "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src * ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+            return "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' blob:; worker-src * blob:; style-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; connect-src * ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
         }
 
         return "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";

@@ -40,7 +40,7 @@ final class GenerateEmbeddingsJob implements ShouldQueue
     /**
      * @var int
      */
-    public $timeout = 300;
+    public $timeout = 900;
 
     public function __construct(
         public readonly int $documentId,

@@ -25,6 +25,13 @@ final class HybridSearchService
     private const VECTOR_WEIGHT = 0.7;
 
     /**
+     * Candidates fetched from SQL and re-ranked in PHP per query. The
+     * window has to hold a whole document's worth of chunks: a small
+     * LIMIT applied before scoring silently hides the deeper pages.
+     */
+    private const CANDIDATE_POOL = 1000;
+
+    /**
      * @return Collection<int, array{document_id: int, chunk_index: int, score: float, snippet: string, document_number: string|null, document_type: string|null, fiscal_year: int|null, original_filename: string}>
      */
     public function search(
@@ -34,7 +41,7 @@ final class HybridSearchService
         ?string $documentType = null,
         int $limit = 10,
     ): Collection {
-        $chunks = $this->candidates($query, $user, $fiscalYear, $documentType, $limit * 5);
+        $chunks = $this->candidates($query, $user, $fiscalYear, $documentType);
 
         if ($chunks->isEmpty()) {
             return new Collection;
@@ -77,6 +84,11 @@ final class HybridSearchService
      * similarity only re-ranks — the tenancy boundary is never
      * crossed client-side (§36).
      *
+     * Every chunk with a vector stays a candidate so semantic matches
+     * without keyword overlap survive; chunks without one are admitted
+     * through the per-term LIKE, which is what lexical scoring needs
+     * when the query embedding is unavailable.
+     *
      * @return EloquentCollection<int, DocumentChunk>
      */
     private function candidates(
@@ -84,17 +96,25 @@ final class HybridSearchService
         User $user,
         ?int $fiscalYear,
         ?string $documentType,
-        int $limit,
     ): EloquentCollection {
+        $terms = $this->terms($query);
+
         return DocumentChunk::query()
             ->whereHas('document', fn (Builder $q): Builder => $q->accessibleBy($user))
             ->when($fiscalYear !== null, fn (Builder $q): Builder => $q->where('fiscal_year', $fiscalYear))
             ->when($documentType !== null, fn (Builder $q): Builder => $q->where('document_type', $documentType))
             ->where(fn (Builder $q): Builder => $q
                 ->whereNotNull('embedding')
-                ->orWhere(fn (Builder $q): Builder => $q->where('content', 'like', '%'.$this->escapeLike($query).'%')))
+                ->when($terms !== [], fn (Builder $q): Builder => $q
+                    ->orWhere(function (Builder $or) use ($terms): void {
+                        foreach ($terms as $term) {
+                            $or->orWhere('content', 'like', '%'.$this->escapeLike($term).'%');
+                        }
+                    })))
             ->with('document:id,document_number,original_filename')
-            ->limit($limit)
+            ->orderByDesc('document_id')
+            ->orderBy('chunk_index')
+            ->limit(self::CANDIDATE_POOL)
             ->get();
     }
 

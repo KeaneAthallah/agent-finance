@@ -55,7 +55,13 @@ class DocumentController extends Controller
             ->withQueryString();
 
         return Inertia::render('documents/index', [
-            'documents' => DocumentResource::collection($documents),
+            'documents' => [
+                'data' => DocumentResource::collection($documents->getCollection())->resolve($request),
+                'current_page' => $documents->currentPage(),
+                'last_page' => $documents->lastPage(),
+                'total' => $documents->total(),
+                'links' => $documents->linkCollection()->all(),
+            ],
             'filters' => [
                 'status' => $request->string('status')->toString(),
                 'document_type_id' => $request->integer('document_type_id') ?: null,

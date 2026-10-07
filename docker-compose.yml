@@ -11,6 +11,13 @@ services:
             # Inside the compose network the services are reachable by name.
             DB_HOST: mysql
             REDIS_HOST: redis
+            # The queue service runs `queue:work redis`, so containers must not
+            # inherit a host-side QUEUE_CONNECTION (e.g. database) from .env.
+            QUEUE_CONNECTION: redis
+            # Mirror the mysql service's dedicated credentials so a host-side
+            # .env with other DB_* values cannot break container bootstrap.
+            DB_USERNAME: agent_finance
+            DB_PASSWORD: secret
         volumes:
             - .:/var/www
         depends_on:
@@ -31,17 +38,37 @@ services:
             - app
         restart: unless-stopped
 
+    # Runs the Vite dev server from the app image so `php artisan
+    # wayfinder:generate` (invoked by the Vite wayfinder plugin) is available.
     frontend:
-        image: node:22-alpine
-        working_dir: /app
+        build:
+            context: .
+            dockerfile: docker/app/Dockerfile
+            target: dev
+        env_file: .env
+        environment:
+            DB_HOST: mysql
+            REDIS_HOST: redis
+            DB_USERNAME: agent_finance
+            DB_PASSWORD: secret
+            # Vite binds 0.0.0.0 inside the container, but the hot file must
+            # advertise a host the browser can reach. laravel-vite-plugin
+            # resolves LARAVEL_SAIL to `localhost` instead of the bind address.
+            LARAVEL_SAIL: '1'
         # Anonymous volume so the container installs Linux-native deps
         # without clobbering the host's node_modules (Windows/macOS dev).
         volumes:
-            - .:/app
-            - /app/node_modules
+            - .:/var/www
+            - /var/www/node_modules
         ports:
             - '5173:5173'
-        command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"
+        # No `--host`: with LARAVEL_SAIL the Laravel Vite plugin binds 0.0.0.0
+        # itself and advertises `localhost` in the hot file (a CLI --host is
+        # merged into the user config and makes the hot file say 0.0.0.0, which
+        # browsers cannot connect to).
+        # npm ci (not npm install): never rewrites the mounted package-lock.json
+        # (container npm differs from the host's, and the project dir is /var/www).
+        command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --port 5173"
         profiles: ['hmr']
         restart: unless-stopped
 
@@ -90,6 +117,9 @@ services:
         environment:
             DB_HOST: mysql
             REDIS_HOST: redis
+            QUEUE_CONNECTION: redis
+            DB_USERNAME: agent_finance
+            DB_PASSWORD: secret
         volumes:
             - .:/var/www
         depends_on:
@@ -105,7 +135,7 @@ services:
                 'redis',
                 '--tries=3',
                 '--backoff=10',
-                '--timeout=600',
+                '--timeout=900',
                 '--memory=256',
                 '--sleep=3',
             ]
@@ -120,6 +150,9 @@ services:
         environment:
             DB_HOST: mysql
             REDIS_HOST: redis
+            QUEUE_CONNECTION: redis
+            DB_USERNAME: agent_finance
+            DB_PASSWORD: secret
         volumes:
             - .:/var/www
         depends_on:

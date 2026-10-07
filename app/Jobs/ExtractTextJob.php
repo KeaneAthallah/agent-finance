@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
@@ -80,7 +81,13 @@ final class ExtractTextJob implements ShouldQueue
                     $page->update(['image_path' => $document->file_path]);
                 }
 
-                $result = $ocr->process($page->image_path ?? '');
+                // image_path is stored relative to the documents disk, but the
+                // OCR provider needs a local absolute path for tesseract.
+                $ocrInput = filled($page->image_path)
+                    ? Storage::disk($disk)->path($page->image_path)
+                    : '';
+
+                $result = $ocr->process($ocrInput);
 
                 $page->update([
                     'extracted_text' => $result->text !== '' ? $result->text : $page->extracted_text,
