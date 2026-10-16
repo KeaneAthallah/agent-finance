@@ -7,13 +7,13 @@ use App\Models\AiRun;
 use App\Models\AiUsage;
 use App\Models\Document;
 use App\Models\DocumentExtraction;
-use App\Models\DocumentPage;
 use App\Services\Ai\AiExtractionRequest;
 use App\Services\Ai\AiExtractionResult;
 use App\Services\Ai\AIProviderInterface;
 use App\Services\Ai\PromptRegistry;
 use App\Services\Extraction\ExtractionSchema;
 use App\Services\Extraction\ExtractionSchemaRegistry;
+use App\Support\DocumentPagePayloads;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -94,15 +94,7 @@ final class ExtractFinancialDataJob implements ShouldQueue
         $document->update(['status' => DocumentStatus::AiAnalysis]);
 
         try {
-            $pages = $document->pages()
-                ->orderBy('page_number')
-                ->get()
-                ->map(fn (DocumentPage $page): array => [
-                    'page' => (int) $page->page_number,
-                    'text' => (string) $page->extracted_text,
-                ])
-                ->values()
-                ->all();
+            $pages = DocumentPagePayloads::for($document);
 
             $result = $ai->extractStructuredData(new AiExtractionRequest(
                 pages: $pages,

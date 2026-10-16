@@ -198,6 +198,7 @@ final class FakeAIProvider implements AIProviderInterface, StreamingAIProviderIn
         $intents = [
             ['pattern' => '/(anggaran|budget|ringkasan anggaran|total anggaran|jumlah anggaran)/', 'tool' => 'get_budget_summary', 'arguments' => ['fiscal_year' => $year]],
             ['pattern' => '/(banding|perbandingan|compare|versus|\bsihandal\b)/', 'tool' => 'compare_document_with_sihandal', 'arguments' => ['document_id' => $id]],
+            ['pattern' => '/(isi (dokumen|lengkap)|teks (dokumen|lengkap)|full text|document text|baca dokumen|read document)/', 'tool' => 'get_document_text', 'arguments' => ['document_id' => $id]],
             ['pattern' => '/(cari|search|temukan|find|mencari)/', 'tool' => 'search_documents', 'arguments' => ['query' => $question]],
             ['pattern' => '/(validasi|anomali|validate|validation)/', 'tool' => 'validate_document', 'arguments' => ['document_id' => $id]],
             ['pattern' => '/(sub[\s-]?kegiatan)/', 'tool' => 'get_sihandal_data', 'arguments' => ['resource' => 'sub_kegiatan', 'fiscal_year' => $year]],
@@ -289,6 +290,11 @@ final class FakeAIProvider implements AIProviderInterface, StreamingAIProviderIn
                 (int) ($result['fiscal_year'] ?? 0),
                 number_format((float) ($result['total_amount'] ?? 0), 0, ',', '.'),
                 (int) ($result['document_count'] ?? 0),
+            ),
+            'get_document_text' => sprintf(
+                'Dokumen %s: teks %d halaman tersedia.',
+                (string) ($result['document_number'] ?? '?'),
+                (int) ($result['page_count'] ?? 0),
             ),
             'search_documents' => sprintf(
                 'Ditemukan %d potongan dokumen yang cocok.',

@@ -8,7 +8,7 @@ namespace App\Services\Ai;
 final class AiExtractionRequest
 {
     /**
-     * @param  array<int, array{page: int, text: string}>  $pages
+     * @param  array<int, array{page: int, text: string, image?: string}>  $pages  image is a base64 data URI when vision is enabled
      * @param  array<string, mixed>|null  $schema  JSON schema the output must satisfy
      */
     public function __construct(

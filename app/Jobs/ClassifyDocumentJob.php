@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\DocumentType;
 use App\Services\Ai\AiDocumentRequest;
 use App\Services\Ai\AIProviderInterface;
+use App\Support\DocumentPagePayloads;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -60,15 +61,7 @@ final class ClassifyDocumentJob implements ShouldQueue
         ]);
 
         try {
-            $pages = $document->pages()
-                ->orderBy('page_number')
-                ->get()
-                ->map(fn ($page) => [
-                    'page' => $page->page_number,
-                    'text' => (string) $page->extracted_text,
-                ])
-                ->values()
-                ->all();
+            $pages = DocumentPagePayloads::for($document);
 
             $catalog = DocumentType::query()->where('is_active', true)->pluck('code')->implode(', ');
 

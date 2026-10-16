@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Services\Ai\AiChatRequest;
+use App\Services\Ai\AiDocumentRequest;
 use App\Services\Ai\OpenAIProvider;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -73,6 +74,91 @@ final class OpenAIProviderTest extends TestCase
 
             return ($function['name'] ?? null) === 'get_revenue'
                 && ($parameters['type'] ?? null) === 'object';
+        });
+    }
+
+    public function test_document_analysis_sends_image_parts_when_a_page_has_an_image(): void
+    {
+        Http::fake([
+            'example.test/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => '{"document_type": "spm", "confidence": 0.9}'],
+                ]],
+                'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 5],
+            ]),
+        ]);
+
+        $result = (new OpenAIProvider)->analyzeDocument(new AiDocumentRequest(
+            pages: [[
+                'page' => 1,
+                'text' => 'Nomor: SPM-1',
+                'image' => 'data:image/png;base64,QUJD',
+            ]],
+        ));
+
+        $this->assertSame('spm', $result->documentType);
+
+        Http::assertSent(function (Request $request): bool {
+            /** @var array<string, mixed> $body */
+            $body = json_decode($request->body(), true);
+
+            /** @var array<int, array<string, mixed>> $messages */
+            $messages = is_array($body['messages'] ?? null) ? $body['messages'] : [];
+
+            $content = $messages[1]['content'] ?? null;
+
+            if (! is_array($content)) {
+                return false;
+            }
+
+            $imageFound = false;
+            $textFound = false;
+
+            foreach ($content as $part) {
+                if (! is_array($part)) {
+                    continue;
+                }
+
+                if (($part['type'] ?? null) === 'image_url'
+                    && ($part['image_url']['url'] ?? null) === 'data:image/png;base64,QUJD') {
+                    $imageFound = true;
+                }
+
+                if (($part['type'] ?? null) === 'text'
+                    && str_contains((string) ($part['text'] ?? ''), 'Nomor: SPM-1')) {
+                    $textFound = true;
+                }
+            }
+
+            return $imageFound && $textFound;
+        });
+    }
+
+    public function test_document_analysis_stays_plain_text_without_images(): void
+    {
+        Http::fake([
+            'example.test/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => ['content' => '{"document_type": "spm", "confidence": 0.9}'],
+                ]],
+                'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 5],
+            ]),
+        ]);
+
+        (new OpenAIProvider)->analyzeDocument(new AiDocumentRequest(
+            pages: [['page' => 1, 'text' => 'Nomor: SPM-1']],
+        ));
+
+        Http::assertSent(function (Request $request): bool {
+            /** @var array<string, mixed> $body */
+            $body = json_decode($request->body(), true);
+
+            /** @var array<int, array<string, mixed>> $messages */
+            $messages = is_array($body['messages'] ?? null) ? $body['messages'] : [];
+
+            $content = $messages[1]['content'] ?? null;
+
+            return is_string($content) && str_contains($content, '--- Page 1 ---');
         });
     }
 

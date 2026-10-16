@@ -437,6 +437,7 @@ it('exposes only read-only tools', function () {
     expect($names)->toBe([
         'compare_document_with_sihandal',
         'get_budget_summary',
+        'get_document_text',
         'get_sihandal_data',
         'search_documents',
         'validate_document',

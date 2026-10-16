@@ -62,6 +62,13 @@ final class ExtractTextJob implements ShouldQueue
 
             $disk = (string) config('agent-finance.documents.disk');
 
+            // Vision-first (spec §9): when vision is enabled and the OCR
+            // fallback is disabled, the multimodal model reads the page image
+            // directly and the Tesseract pass is skipped. The image is still
+            // rendered so the extraction stage can attach it.
+            $visionFirst = (bool) config('agent-finance.ai.vision.enabled', false)
+                && ! (bool) config('agent-finance.ai.vision.ocr_fallback', true);
+
             foreach ($pages as $page) {
                 $needsOcr = $ocr->isRequired($page->extracted_text);
 
@@ -79,6 +86,16 @@ final class ExtractTextJob implements ShouldQueue
                     ]);
                 } elseif (str_starts_with($document->mime_type, 'image/')) {
                     $page->update(['image_path' => $document->file_path]);
+                }
+
+                if ($visionFirst && filled($page->image_path)) {
+                    $page->update([
+                        'text_source' => 'vision',
+                        'processing_status' => 'done',
+                        'error' => null,
+                    ]);
+
+                    continue;
                 }
 
                 // image_path is stored relative to the documents disk, but the

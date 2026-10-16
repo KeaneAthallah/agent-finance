@@ -14,6 +14,7 @@ final class ToolRegistry
     /** @var array<int, class-string<ToolInterface>> */
     private const TOOLS = [
         GetBudgetSummaryTool::class,
+        GetDocumentTextTool::class,
         SearchDocumentsTool::class,
         CompareDocumentWithSihandalTool::class,
         GetSihandalDataTool::class,

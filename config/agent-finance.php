@@ -32,6 +32,24 @@ return [
         'provider' => env('AI_PROVIDER', 'openai'),
         'default_model' => env('AI_DEFAULT_MODEL', 'gpt-4o-mini'),
         'embedding_model' => env('AI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+
+        /*
+        | Vision-first reading (spec §9, §10): when enabled, page images are
+        | attached to the classification/extraction call as base64 data URIs,
+        | so the multimodal model reads the document natively (layout, tables,
+        | handwriting) instead of only the OCR text. The OCR text always
+        | travels with the image and remains the fallback when vision is
+        | disabled or a page has no image. `max_pages`/`max_bytes` bound the
+        | request size; `ocr_fallback` keeps the Tesseract text layer useful
+        | for search/RAG even when the model reads the image.
+        */
+        'vision' => [
+            'enabled' => (bool) env('AI_VISION_ENABLED', false),
+            'max_pages' => (int) env('AI_VISION_MAX_PAGES', 20),
+            'max_bytes' => (int) env('AI_VISION_MAX_BYTES', 4_000_000),
+            'ocr_fallback' => (bool) env('AI_VISION_OCR_FALLBACK', true),
+        ],
+
         'providers' => [
             'openai' => ['key' => env('OPENAI_API_KEY')],
             'anthropic' => ['key' => env('ANTHROPIC_API_KEY')],

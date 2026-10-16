@@ -15,13 +15,12 @@ final class OpenAIProvider implements AIProviderInterface, StreamingAIProviderIn
 {
     public function analyzeDocument(AiDocumentRequest $request): AiDocumentResult
     {
-        $pages = collect($request->pages)
-            ->map(fn (array $page) => "--- Page {$page['page']} ---\n{$page['text']}")
-            ->implode("\n\n");
-
         $payload = $this->complete([
             ['role' => 'system', 'content' => $this->systemGuard()],
-            ['role' => 'user', 'content' => "Classify this financial document. Respond as JSON: {\"document_type\": string, \"confidence\": float, \"reasoning\": string}\n\n".$pages],
+            ['role' => 'user', 'content' => $this->pageContent(
+                $request->pages,
+                'Classify this financial document. Respond as JSON: {"document_type": string, "confidence": float, "reasoning": string}',
+            )],
         ]);
 
         /** @var array{document_type?: string, confidence?: float} $decoded */
@@ -36,10 +35,6 @@ final class OpenAIProvider implements AIProviderInterface, StreamingAIProviderIn
 
     public function extractStructuredData(AiExtractionRequest $request): AiExtractionResult
     {
-        $pages = collect($request->pages)
-            ->map(fn (array $page) => "--- Page {$page['page']} ---\n{$page['text']}")
-            ->implode("\n\n");
-
         $schemaHint = $request->schema !== null
             ? "\n\nThe output MUST validate against this JSON schema:\n".json_encode($request->schema)
             : '';
@@ -56,7 +51,10 @@ SPEC;
 
         $payload = $this->complete([
             ['role' => 'system', 'content' => $this->systemGuard()],
-            ['role' => 'user', 'content' => "Extract structured financial data from this {$request->documentType} document. Respond only with JSON.{$schemaHint}{$evidenceSpec}\n\n".$pages],
+            ['role' => 'user', 'content' => $this->pageContent(
+                $request->pages,
+                "Extract structured financial data from this {$request->documentType} document. Respond only with JSON.{$schemaHint}{$evidenceSpec}",
+            )],
         ], ['response_format' => ['type' => 'json_object']]);
 
         /** @var array<string, mixed> $decoded */
@@ -301,6 +299,55 @@ SPEC;
             toolCalls: $toolCalls,
             meta: ['provider' => 'openai', 'model' => $model],
         );
+    }
+
+    /**
+     * Build the user-message content for a document. Pages without an image
+     * keep the original plain-string form (text only). When any page carries
+     * an image the content becomes the multimodal parts array, so the model
+     * reads the page natively (spec §9); the OCR text still accompanies each
+     * image as the fallback signal.
+     *
+     * @param  array<int, array{page: int, text: string, image?: string}>  $pages
+     * @return string|array<int, array<string, mixed>>
+     */
+    private function pageContent(array $pages, string $instruction): string|array
+    {
+        $hasImages = false;
+
+        foreach ($pages as $page) {
+            if (is_string($page['image'] ?? null) && $page['image'] !== '') {
+                $hasImages = true;
+
+                break;
+            }
+        }
+
+        if (! $hasImages) {
+            $text = collect($pages)
+                ->map(fn (array $page) => "--- Page {$page['page']} ---\n{$page['text']}")
+                ->implode("\n\n");
+
+            return $instruction."\n\n".$text;
+        }
+
+        $parts = [['type' => 'text', 'text' => $instruction]];
+
+        foreach ($pages as $page) {
+            $parts[] = [
+                'type' => 'text',
+                'text' => "--- Page {$page['page']} ---\n{$page['text']}",
+            ];
+
+            if (is_string($page['image'] ?? null) && $page['image'] !== '') {
+                $parts[] = [
+                    'type' => 'image_url',
+                    'image_url' => ['url' => $page['image']],
+                ];
+            }
+        }
+
+        return $parts;
     }
 
     /**
