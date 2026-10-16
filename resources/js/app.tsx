@@ -5,6 +5,6 @@ const appName = import.meta.env.VITE_APP_NAME || 'Agent Finance';
 void createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     progress: {
-        color: '#1d4ed8',
+        color: '#4f46e5',
     },
 });

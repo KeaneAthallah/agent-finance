@@ -10,21 +10,24 @@ import ReviewController from '@/actions/App/Http/Controllers/ReviewController';
 import SihandalController from '@/actions/App/Http/Controllers/SihandalController';
 import {
     ActivityIcon,
+    AiIcon,
     AnomaliesIcon,
     CheckCircleIcon,
-    CircleIcon,
     ClockIcon,
     DocumentsIcon,
     RefreshIcon,
     ReviewIcon,
     ScanIcon,
     SihandalIcon,
+    UploadIcon,
     ValidationIcon,
 } from '@/components/icons';
 import {
     Badge,
+    Button,
     Card,
     CardContent,
+    SectionTitle,
     StatCard,
     WorkflowStepper,
 } from '@/components/ui';
@@ -184,24 +187,53 @@ export default function Dashboard({ counters }: Props) {
         >
             <Head title="Dashboard" />
 
-            {/* Greeting */}
-            <div className="mb-6">
-                <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                    {greeting()}, {firstName}
-                </h1>
-                <p className="mt-1 text-sm text-muted">
-                    Here is what is happening with your financial documents
-                    right now.
-                </p>
+            {/* Greeting hero */}
+            <div className="relative mb-6 overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-sm">
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-brand/10 blur-3xl"
+                />
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-28 right-40 h-56 w-56 rounded-full bg-purple/10 blur-3xl"
+                />
+                <div className="relative flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-medium tracking-wide text-brand uppercase">
+                            {greeting()}
+                        </p>
+                        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+                            Welcome back, {firstName}
+                        </h1>
+                        <p className="mt-1.5 max-w-xl text-sm text-muted">
+                            Here is what is happening with your financial
+                            documents right now.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link href={DocumentController.index.url()}>
+                            <Button variant="outline">
+                                <UploadIcon size={15} />
+                                Upload
+                            </Button>
+                        </Link>
+                        <Link href={AiAssistantController.index.url()}>
+                            <Button>
+                                <AiIcon size={15} />
+                                Ask the assistant
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
             </div>
 
             {/* KPIs */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
                 {kpis.map((kpi) => (
                     <Link
                         key={kpi.label}
                         href={kpi.href}
-                        className="cursor-pointer rounded-lg transition-transform hover:-translate-y-px"
+                        className="cursor-pointer rounded-xl transition-transform hover:-translate-y-0.5"
                     >
                         <StatCard
                             label={kpi.label}
@@ -215,50 +247,53 @@ export default function Dashboard({ counters }: Props) {
             </div>
 
             {/* Workflow */}
-            <Card className="mt-4">
-                <CardContent className="p-4">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <h2 className="text-sm font-semibold text-foreground">
-                            Document workflow
-                        </h2>
-                        {counters.failed > 0 ? (
-                            <Badge variant="red">
-                                <AnomaliesIcon size={12} />
-                                {counters.failed} failed
-                            </Badge>
-                        ) : (
-                            <Badge variant="green">
-                                <CheckCircleIcon size={12} />
-                                Pipeline healthy
-                            </Badge>
-                        )}
-                    </div>
+            <Card className="mb-4">
+                <CardContent className="p-5">
+                    <SectionTitle
+                        title="Document workflow"
+                        description="Live view of every stage in the pipeline"
+                        actions={
+                            counters.failed > 0 ? (
+                                <Badge variant="red">
+                                    <AnomaliesIcon size={12} />
+                                    {counters.failed} failed
+                                </Badge>
+                            ) : (
+                                <Badge variant="green">
+                                    <CheckCircleIcon size={12} />
+                                    Pipeline healthy
+                                </Badge>
+                            )
+                        }
+                    />
                     <WorkflowStepper stages={stages} />
                 </CardContent>
             </Card>
 
             {/* Attention + orientation */}
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-2">
                 <Card>
                     <CardContent className="p-5">
-                        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                            <ClockIcon size={15} className="text-muted" />
-                            Needs attention
-                        </h2>
+                        <SectionTitle
+                            title="Needs attention"
+                            actions={
+                                <ClockIcon size={15} className="text-muted" />
+                            }
+                        />
                         {counters.needs_review === 0 &&
                         counters.failed === 0 ? (
-                            <p className="mt-2 text-sm text-muted">
+                            <p className="text-sm text-muted">
                                 Nothing is waiting. Documents that need a human
                                 decision appear here the moment the validation
                                 engine flags them.
                             </p>
                         ) : (
-                            <ul className="mt-3 space-y-2">
+                            <ul className="space-y-2">
                                 {counters.needs_review > 0 ? (
                                     <li>
                                         <Link
                                             href={ReviewController.index.url()}
-                                            className="group flex items-center justify-between rounded-md border border-border bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-brand/40"
+                                            className="group flex items-center justify-between rounded-xl border border-border bg-elevated px-4 py-3 text-sm transition-colors hover:border-brand/40 hover:bg-brand-subtle/40"
                                         >
                                             <span className="flex items-center gap-2.5 text-foreground">
                                                 <ReviewIcon
@@ -272,7 +307,7 @@ export default function Dashboard({ counters }: Props) {
                                                 waiting for review
                                             </span>
                                             <span className="text-xs font-medium text-brand">
-                                                Open queue
+                                                Open queue →
                                             </span>
                                         </Link>
                                     </li>
@@ -285,7 +320,7 @@ export default function Dashboard({ counters }: Props) {
                                                     status: 'processing_failed',
                                                 },
                                             })}
-                                            className="group flex items-center justify-between rounded-md border border-border bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-brand/40"
+                                            className="group flex items-center justify-between rounded-xl border border-border bg-elevated px-4 py-3 text-sm transition-colors hover:border-brand/40 hover:bg-brand-subtle/40"
                                         >
                                             <span className="flex items-center gap-2.5 text-foreground">
                                                 <AnomaliesIcon
@@ -299,7 +334,7 @@ export default function Dashboard({ counters }: Props) {
                                                     : 's'}
                                             </span>
                                             <span className="text-xs font-medium text-brand">
-                                                View
+                                                View →
                                             </span>
                                         </Link>
                                     </li>
@@ -311,55 +346,53 @@ export default function Dashboard({ counters }: Props) {
 
                 <Card>
                     <CardContent className="p-5">
-                        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                            <ActivityIcon size={15} className="text-muted" />
-                            How the pipeline works
-                        </h2>
-                        <ol className="mt-3 space-y-2.5 text-sm text-muted">
-                            <li className="flex items-start gap-2.5">
-                                <ScanIcon
-                                    size={15}
-                                    className="mt-0.5 shrink-0 text-info"
-                                />
-                                <span>
+                        <SectionTitle
+                            title="How the pipeline works"
+                            actions={
+                                <ActivityIcon size={15} className="text-muted" />
+                            }
+                        />
+                        <ol className="space-y-3 text-sm text-muted">
+                            <li className="flex items-start gap-3">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info-subtle text-info">
+                                    <ScanIcon size={14} />
+                                </span>
+                                <span className="pt-1">
                                     Upload a financial document — OCR and AI
                                     extraction pull out the structured fields
                                     with evidence.
                                 </span>
                             </li>
-                            <li className="flex items-start gap-2.5">
-                                <ValidationIcon
-                                    size={15}
-                                    className="mt-0.5 shrink-0 text-warning"
-                                />
-                                <span>
+                            <li className="flex items-start gap-3">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-warning-subtle text-warning">
+                                    <ValidationIcon size={14} />
+                                </span>
+                                <span className="pt-1">
                                     The validation engine checks totals, fiscal
                                     year and completeness — anomalies block
                                     automatic approval.
                                 </span>
                             </li>
-                            <li className="flex items-start gap-2.5">
-                                <ReviewIcon
-                                    size={15}
-                                    className="mt-0.5 shrink-0 text-warning"
-                                />
-                                <span>
+                            <li className="flex items-start gap-3">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-warning-subtle text-warning">
+                                    <ReviewIcon size={14} />
+                                </span>
+                                <span className="pt-1">
                                     A human reviews AI output and confirms or
                                     corrects it. AI recommends, humans decide.
                                 </span>
                             </li>
-                            <li className="flex items-start gap-2.5">
-                                <SihandalIcon
-                                    size={15}
-                                    className="mt-0.5 shrink-0 text-purple"
-                                />
-                                <span>
+                            <li className="flex items-start gap-3">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-purple-subtle text-purple">
+                                    <SihandalIcon size={14} />
+                                </span>
+                                <span className="pt-1">
                                     Confirmed documents sync to SIHANDAL — the
                                     system of record — through the API.
                                 </span>
                             </li>
                         </ol>
-                        <div className="mt-4 flex flex-wrap gap-2">
+                        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-4">
                             <Link
                                 href={AiAssistantController.index.url()}
                                 className="text-xs font-medium text-brand hover:underline"
@@ -387,11 +420,11 @@ export default function Dashboard({ counters }: Props) {
 
             {counters.uploaded === 0 ? (
                 <Card className="mt-4">
-                    <CardContent className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-subtle text-brand">
-                            <CircleIcon size={20} />
+                    <CardContent className="flex flex-col items-center gap-2 px-6 py-14 text-center">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand to-purple text-brand-foreground shadow-md">
+                            <DocumentsIcon size={22} />
                         </span>
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="mt-1 text-base font-semibold text-foreground">
                             No documents yet
                         </p>
                         <p className="max-w-md text-sm text-muted">
@@ -400,9 +433,10 @@ export default function Dashboard({ counters }: Props) {
                         </p>
                         <Link
                             href={DocumentController.index.url()}
-                            className="mt-2 inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-strong"
+                            className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-4 text-sm font-medium text-brand-foreground shadow-sm transition-colors hover:bg-brand-strong"
                         >
-                            Go to documents
+                            <UploadIcon size={15} />
+                            Upload a document
                         </Link>
                     </CardContent>
                 </Card>

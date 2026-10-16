@@ -438,7 +438,7 @@ export default function ReportsIndex({
                                 value={number(aiCost.output_tokens)}
                             />
                         </div>
-                        <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-elevated p-3">
+                        <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-elevated p-3">
                             <span className="text-xs font-medium text-muted">
                                 Estimated cost
                             </span>
@@ -464,7 +464,7 @@ export default function ReportsIndex({
                         <div className="scroll-thin overflow-x-auto">
                             <table className="w-full min-w-[640px] text-sm">
                                 <thead>
-                                    <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                    <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                         <th className="py-2 pr-4 font-medium">
                                             Model
                                         </th>
@@ -486,7 +486,7 @@ export default function ReportsIndex({
                                     {aiCostByModel.map((row) => (
                                         <tr
                                             key={row.model}
-                                            className="border-b border-border last:border-0"
+                                            className="border-b border-border transition-colors last:border-0 hover:bg-elevated"
                                         >
                                             <td className="py-2 pr-4 font-medium text-foreground">
                                                 {row.model}

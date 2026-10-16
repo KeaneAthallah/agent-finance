@@ -9,11 +9,14 @@ import {
 } from '@/components/icons';
 import {
     Badge,
+    Button,
     Card,
     CardContent,
     EmptyState,
+    Label,
     PageHeader,
     PaginationLinks,
+    Select,
 } from '@/components/ui';
 import type { InertiaPageProps } from '@/types';
 
@@ -80,36 +83,24 @@ export default function ActivityIndex({ logs, filters }: Props) {
                 <form id="activity-filters" method="get">
                     <CardContent className="grid items-end gap-3 p-4 md:grid-cols-3">
                         <div>
-                            <label
-                                htmlFor="filter_actor"
-                                className="mb-1 block text-sm font-medium text-muted"
-                            >
-                                Actor type
-                            </label>
-                            <select
+                            <Label htmlFor="filter_actor">Actor type</Label>
+                            <Select
                                 id="filter_actor"
                                 name="actor_type"
                                 defaultValue={filters.actor_type}
-                                className="h-10 w-full cursor-pointer rounded-md border border-border-strong bg-surface px-2 text-sm text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none"
                             >
                                 <option value="">All</option>
                                 <option value="human">Human</option>
                                 <option value="ai">AI</option>
                                 <option value="system">System</option>
-                            </select>
+                            </Select>
                         </div>
                         <div>
-                            <label
-                                htmlFor="filter_action"
-                                className="mb-1 block text-sm font-medium text-muted"
-                            >
-                                Action
-                            </label>
-                            <select
+                            <Label htmlFor="filter_action">Action</Label>
+                            <Select
                                 id="filter_action"
                                 name="action"
                                 defaultValue={filters.action}
-                                className="h-10 w-full cursor-pointer rounded-md border border-border-strong bg-surface px-2 text-sm text-foreground focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none"
                             >
                                 <option value="">All</option>
                                 {Object.keys(ACTION_LABELS).map((action) => (
@@ -117,21 +108,19 @@ export default function ActivityIndex({ logs, filters }: Props) {
                                         {ACTION_LABELS[action]}
                                     </option>
                                 ))}
-                            </select>
+                            </Select>
                         </div>
-                        <button
-                            type="submit"
-                            form="activity-filters"
-                            className="h-10 cursor-pointer rounded-md bg-brand px-4 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-strong"
-                        >
-                            Apply filters
-                        </button>
+                        <div>
+                            <Button type="submit" form="activity-filters">
+                                Apply filters
+                            </Button>
+                        </div>
                     </CardContent>
                 </form>
             </Card>
 
             <Card>
-                <CardContent className="p-4">
+                <CardContent className="p-5">
                     {logs.data.length === 0 ? (
                         <EmptyState
                             icon={<ActivityIcon size={20} />}

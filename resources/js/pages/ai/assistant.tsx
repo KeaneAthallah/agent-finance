@@ -13,6 +13,7 @@ import {
     InfoIcon,
     RefreshIcon,
     SendIcon,
+    SettingsIcon,
     XIcon,
 } from '@/components/icons';
 import {
@@ -93,6 +94,13 @@ const LABEL_EXPLANATIONS: Record<StatementLabel, string> = {
     CALCULATION: 'Computed from extracted financial values',
     'AI INTERPRETATION': 'AI reasoning — verify before relying on it',
     WARNING: 'Potential inconsistency worth checking',
+};
+
+const LABEL_ACCENTS: Record<StatementLabel, string> = {
+    FACT: 'border-l-success',
+    CALCULATION: 'border-l-info',
+    'AI INTERPRETATION': 'border-l-purple',
+    WARNING: 'border-l-warning',
 };
 
 const SUGGESTIONS = [
@@ -624,27 +632,29 @@ export default function AiAssistant({ conversations: initialConversations }: Pro
         <AppShell title="AI Assistant" subtitle="Grounded financial Q&A">
             <Head title="AI assistant" />
 
-            <Card className="mb-4">
-                <CardContent className="flex flex-wrap items-center gap-2 p-4 text-sm text-muted">
-                    <span className="flex items-center gap-2 font-medium text-foreground">
-                        <InfoIcon size={15} className="text-info" />
-                        Every statement is labeled by trust level — financial
-                        numbers only ever come from tool results. The assistant
-                        is read-only.
-                    </span>
-                    <span className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="green">FACT</Badge>
-                        <Badge variant="blue">CALCULATION</Badge>
-                        <Badge variant="purple">AI INTERPRETATION</Badge>
-                        <Badge variant="amber">WARNING</Badge>
-                    </span>
-                </CardContent>
-            </Card>
+            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-info/25 bg-info-subtle/50 px-4 py-3 text-sm">
+                <span className="flex items-center gap-2 font-medium text-foreground">
+                    <InfoIcon size={15} className="text-info" />
+                    Read-only · every statement is labeled by trust level ·
+                    financial numbers only ever come from tool results.
+                </span>
+                <span className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="green">FACT</Badge>
+                    <Badge variant="blue">CALCULATION</Badge>
+                    <Badge variant="purple">AI INTERPRETATION</Badge>
+                    <Badge variant="amber">WARNING</Badge>
+                </span>
+            </div>
 
             <Card className="mb-4">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
                     <CardTitle>Conversations</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={newChat}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={newChat}
+                    >
                         <RefreshIcon size={13} />
                         New chat
                     </Button>
@@ -661,34 +671,40 @@ export default function AiAssistant({ conversations: initialConversations }: Pro
                             return (
                                 <span
                                     key={conversation.id}
-                                    className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+                                    className={`flex items-center gap-1.5 rounded-full border py-0.5 pr-1 pl-2.5 text-xs transition-colors ${
                                         active
-                                            ? 'border-brand bg-brand-foreground text-brand'
+                                            ? 'border-brand/40 bg-brand-subtle text-brand'
                                             : 'border-border bg-elevated text-foreground'
                                     }`}
                                 >
                                     <button
                                         type="button"
-                                        onClick={() => openConversation(conversation.id)}
-                                        className="max-w-[200px] truncate"
+                                        onClick={() =>
+                                            openConversation(conversation.id)
+                                        }
+                                        className="max-w-[200px] cursor-pointer truncate"
                                         title={conversation.title}
                                     >
                                         {conversation.title}
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => renameConversation(conversation)}
+                                        onClick={() =>
+                                            renameConversation(conversation)
+                                        }
                                         aria-label="Rename"
-                                        className="text-subtle hover:text-foreground"
+                                        className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-subtle hover:bg-surface hover:text-foreground"
                                         title="Rename"
                                     >
-                                        ⚙
+                                        <SettingsIcon size={12} />
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => deleteConversation(conversation)}
+                                        onClick={() =>
+                                            deleteConversation(conversation)
+                                        }
                                         aria-label="Delete"
-                                        className="text-subtle hover:text-danger"
+                                        className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-subtle hover:bg-surface hover:text-danger"
                                         title="Delete"
                                     >
                                         <XIcon size={12} />
@@ -736,96 +752,119 @@ export default function AiAssistant({ conversations: initialConversations }: Pro
                             {messages.map((message, index) =>
                                 message.role === 'user' ? (
                                     <div key={index} className="flex justify-end">
-                                        <div className="max-w-[80%] rounded-lg rounded-br-sm bg-brand px-3 py-2 text-sm text-brand-foreground">
+                                        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-brand px-3.5 py-2.5 text-sm text-brand-foreground shadow-xs">
                                             {message.content}
                                         </div>
                                     </div>
                                 ) : (
-                                    <div
-                                        key={index}
-                                        className="max-w-[92%] space-y-3"
-                                    >
-                                        {renderToolChips(message.toolCalls ?? [])}
-
-                                        <div className="rounded-lg border border-border bg-elevated p-3">
-                                            <Markdown>{message.content}</Markdown>
-                                        </div>
-
-                                        {(message.statements ?? []).map(
-                                            (statement, statementIndex) => {
-                                                const LabelIcon =
-                                                    LABEL_ICONS[statement.label];
-
-                                                return (
-                                                    <div
-                                                        key={statementIndex}
-                                                        className="rounded-lg border border-border bg-elevated p-3"
-                                                    >
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <Badge
-                                                                variant={
-                                                                    LABEL_VARIANTS[
-                                                                        statement
-                                                                            .label
-                                                                    ]
-                                                                }
-                                                            >
-                                                                <LabelIcon
-                                                                    size={11}
-                                                                />
-                                                                {statement.label}
-                                                            </Badge>
-                                                            <span className="text-[11px] text-subtle">
-                                                                {
-                                                                    LABEL_EXPLANATIONS[
-                                                                        statement
-                                                                            .label
-                                                                    ]
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                        <p className="mt-1.5 text-sm text-foreground">
-                                                            {statement.text}
-                                                        </p>
-                                                        {statement.source !==
-                                                        null ? (
-                                                            <p className="mt-1 text-xs text-subtle">
-                                                                source:{' '}
-                                                                {statement.source}
-                                                            </p>
-                                                        ) : null}
-                                                    </div>
-                                                );
-                                            },
-                                        )}
-
-                                        {renderCitations(message.sourceRefs ?? [])}
-
-                                        <div className="flex justify-end">
-                                            {renderCopyButton(
-                                                message.content,
-                                                index,
+                                    <div key={index} className="flex gap-3">
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-purple text-brand-foreground shadow-xs">
+                                            <AiIcon size={14} />
+                                        </span>
+                                        <div className="min-w-0 flex-1 space-y-3">
+                                            {renderToolChips(
+                                                message.toolCalls ?? [],
                                             )}
+
+                                            <div className="rounded-xl border border-border bg-surface p-3.5 shadow-xs">
+                                                <Markdown>
+                                                    {message.content}
+                                                </Markdown>
+                                            </div>
+
+                                            {(message.statements ?? []).map(
+                                                (statement, statementIndex) => {
+                                                    const LabelIcon =
+                                                        LABEL_ICONS[
+                                                            statement.label
+                                                        ];
+
+                                                    return (
+                                                        <div
+                                                            key={statementIndex}
+                                                            className={`rounded-xl border border-l-2 border-border bg-elevated p-3.5 ${LABEL_ACCENTS[statement.label]}`}
+                                                        >
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <Badge
+                                                                    variant={
+                                                                        LABEL_VARIANTS[
+                                                                            statement
+                                                                                .label
+                                                                        ]
+                                                                    }
+                                                                >
+                                                                    <LabelIcon
+                                                                        size={
+                                                                            11
+                                                                        }
+                                                                    />
+                                                                    {
+                                                                        statement.label
+                                                                    }
+                                                                </Badge>
+                                                                <span className="text-[11px] text-subtle">
+                                                                    {
+                                                                        LABEL_EXPLANATIONS[
+                                                                            statement
+                                                                                .label
+                                                                        ]
+                                                                    }
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-1.5 text-sm text-foreground">
+                                                                {statement.text}
+                                                            </p>
+                                                            {statement.source !==
+                                                            null ? (
+                                                                <p className="mt-1 text-xs text-subtle">
+                                                                    source:{' '}
+                                                                    {
+                                                                        statement.source
+                                                                    }
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                    );
+                                                },
+                                            )}
+
+                                            {renderCitations(
+                                                message.sourceRefs ?? [],
+                                            )}
+
+                                            <div className="flex justify-end">
+                                                {renderCopyButton(
+                                                    message.content,
+                                                    index,
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ),
                             )}
 
                             {draft !== null ? (
-                                <div className="max-w-[92%] space-y-3">
-                                    {renderToolChips(draft.toolCalls)}
-                                    <div className="rounded-lg border border-border bg-elevated p-3">
-                                        {draft.content === '' ? (
-                                            <p className="flex items-center gap-2 text-sm text-muted">
-                                                <AiIcon
-                                                    size={14}
-                                                    className="animate-pulse"
-                                                />
-                                                Thinking…
-                                            </p>
-                                        ) : (
-                                            <Markdown>{draft.content}</Markdown>
-                                        )}
+                                <div className="flex gap-3">
+                                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-purple text-brand-foreground shadow-xs">
+                                        <AiIcon size={14} />
+                                    </span>
+                                    <div className="min-w-0 flex-1 space-y-3">
+                                        {renderToolChips(draft.toolCalls)}
+                                        <div className="rounded-xl border border-border bg-surface p-3.5 shadow-xs">
+                                            {draft.content === '' ? (
+                                                <p className="flex items-center gap-2 text-sm text-muted">
+                                                    <AiIcon
+                                                        size={14}
+                                                        className="animate-pulse"
+                                                    />
+                                                    Thinking…
+                                                </p>
+                                            ) : (
+                                                <Markdown>
+                                                    {draft.content}
+                                                </Markdown>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ) : null}

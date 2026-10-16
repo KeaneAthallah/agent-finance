@@ -8,17 +8,22 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Semantic design tokens.
+ * Semantic design tokens — modern SaaS dashboard.
  *
  * @theme inline maps utility names (bg-surface, text-foreground, …)
  * to plain CSS variables, so the same utilities re-resolve when the
  * .dark scope swaps the variable values. Light and dark palettes are
- * designed independently — dark is not an inversion.
+ * designed independently.
+ *
+ * The system is built on a cool, near-neutral canvas with an indigo
+ * primary, generous card radii and layered surfaces so depth comes
+ * from tone rather than heavy borders.
  */
 @theme inline {
     --color-background: var(--background);
     --color-surface: var(--surface);
     --color-elevated: var(--elevated);
+    --color-sunken: var(--sunken);
     --color-border: var(--border);
     --color-border-strong: var(--border-strong);
     --color-foreground: var(--foreground);
@@ -45,78 +50,98 @@
         'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+
+    /* Tighter, product-grade type scale */
+    --text-xs: 0.75rem;
+    --text-xs--line-height: 1.1rem;
+
+    /* Softer, larger radii for cards and controls */
+    --radius-lg: 0.625rem;
+    --radius-xl: 0.875rem;
+    --radius-2xl: 1.125rem;
+
+    /* Layered shadow scale — depth without heavy borders */
+    --shadow-xs: 0 1px 2px 0 oklch(0.2 0.02 265 / 0.04);
+    --shadow-sm: 0 1px 2px 0 oklch(0.2 0.02 265 / 0.06),
+        0 1px 3px -1px oklch(0.2 0.02 265 / 0.06);
+    --shadow-md: 0 2px 4px -1px oklch(0.2 0.02 265 / 0.06),
+        0 6px 16px -4px oklch(0.2 0.02 265 / 0.1);
+    --shadow-lg: 0 4px 8px -2px oklch(0.2 0.02 265 / 0.08),
+        0 16px 40px -8px oklch(0.2 0.02 265 / 0.16);
 }
 
 :root {
-    /* Surfaces — cool, near-white government platform feel */
-    --background: oklch(0.975 0.003 250);
+    /* Surfaces — cool, near-white product canvas */
+    --background: oklch(0.985 0.002 265);
     --surface: oklch(1 0 0);
-    --elevated: oklch(0.985 0.002 250);
+    --elevated: oklch(0.975 0.003 265);
+    --sunken: oklch(0.955 0.004 265);
 
     /* Lines */
-    --border: oklch(0.905 0.004 250);
-    --border-strong: oklch(0.83 0.006 250);
+    --border: oklch(0.925 0.004 265);
+    --border-strong: oklch(0.85 0.006 265);
 
     /* Text */
-    --foreground: oklch(0.2 0.012 250);
-    --muted: oklch(0.44 0.012 250);
-    --subtle: oklch(0.6 0.008 250);
+    --foreground: oklch(0.22 0.02 265);
+    --muted: oklch(0.5 0.016 265);
+    --subtle: oklch(0.64 0.012 265);
 
-    /* Brand — trustworthy institutional blue */
-    --brand: oklch(0.46 0.155 256);
-    --brand-strong: oklch(0.38 0.16 256);
-    --brand-subtle: oklch(0.94 0.03 256);
+    /* Brand — confident indigo */
+    --brand: oklch(0.55 0.2 277);
+    --brand-strong: oklch(0.47 0.2 277);
+    --brand-subtle: oklch(0.955 0.03 277);
     --brand-foreground: oklch(1 0 0);
 
     /* Semantic accents */
-    --success: oklch(0.42 0.14 158);
-    --success-subtle: oklch(0.94 0.035 158);
-    --warning: oklch(0.52 0.15 75);
-    --warning-subtle: oklch(0.94 0.04 75);
-    --danger: oklch(0.46 0.17 27);
-    --danger-subtle: oklch(0.94 0.03 27);
-    --info: oklch(0.46 0.14 220);
-    --info-subtle: oklch(0.94 0.03 220);
-    --purple: oklch(0.48 0.14 300);
-    --purple-subtle: oklch(0.94 0.03 300);
+    --success: oklch(0.55 0.15 158);
+    --success-subtle: oklch(0.955 0.04 158);
+    --warning: oklch(0.62 0.15 70);
+    --warning-subtle: oklch(0.96 0.05 80);
+    --danger: oklch(0.57 0.21 25);
+    --danger-subtle: oklch(0.955 0.04 25);
+    --info: oklch(0.58 0.14 240);
+    --info-subtle: oklch(0.955 0.04 240);
+    --purple: oklch(0.55 0.19 305);
+    --purple-subtle: oklch(0.955 0.04 305);
 
-    --ring: oklch(0.46 0.155 256 / 0.35);
+    --ring: oklch(0.55 0.2 277 / 0.35);
 }
 
 .dark {
-    /* Surfaces — deep slate, intentionally designed for dark */
-    --background: oklch(0.155 0.008 250);
-    --surface: oklch(0.185 0.009 250);
-    --elevated: oklch(0.22 0.01 250);
+    /* Surfaces — deep neutral slate, designed for dark */
+    --background: oklch(0.16 0.012 265);
+    --surface: oklch(0.19 0.013 265);
+    --elevated: oklch(0.23 0.014 265);
+    --sunken: oklch(0.14 0.012 265);
 
     /* Lines */
-    --border: oklch(0.27 0.01 250);
-    --border-strong: oklch(0.36 0.012 250);
+    --border: oklch(0.28 0.014 265);
+    --border-strong: oklch(0.37 0.016 265);
 
     /* Text */
-    --foreground: oklch(0.93 0.005 250);
-    --muted: oklch(0.72 0.008 250);
-    --subtle: oklch(0.55 0.008 250);
+    --foreground: oklch(0.95 0.005 265);
+    --muted: oklch(0.73 0.01 265);
+    --subtle: oklch(0.56 0.01 265);
 
-    /* Brand — lighter blue for contrast on dark */
-    --brand: oklch(0.68 0.14 256);
-    --brand-strong: oklch(0.76 0.13 256);
-    --brand-subtle: oklch(0.26 0.05 256);
-    --brand-foreground: oklch(0.12 0.01 250);
+    /* Brand — lighter indigo for contrast on dark */
+    --brand: oklch(0.68 0.17 277);
+    --brand-strong: oklch(0.76 0.15 277);
+    --brand-subtle: oklch(0.28 0.06 277);
+    --brand-foreground: oklch(0.14 0.02 277);
 
     /* Semantic accents — softened but distinguishable on dark */
-    --success: oklch(0.68 0.15 158);
-    --success-subtle: oklch(0.24 0.045 158);
-    --warning: oklch(0.72 0.15 75);
-    --warning-subtle: oklch(0.26 0.05 75);
-    --danger: oklch(0.68 0.16 27);
-    --danger-subtle: oklch(0.25 0.04 27);
-    --info: oklch(0.68 0.13 220);
-    --info-subtle: oklch(0.24 0.04 220);
-    --purple: oklch(0.7 0.13 300);
-    --purple-subtle: oklch(0.25 0.045 300);
+    --success: oklch(0.7 0.15 158);
+    --success-subtle: oklch(0.24 0.05 158);
+    --warning: oklch(0.75 0.14 80);
+    --warning-subtle: oklch(0.27 0.05 80);
+    --danger: oklch(0.7 0.16 25);
+    --danger-subtle: oklch(0.26 0.05 25);
+    --info: oklch(0.7 0.13 240);
+    --info-subtle: oklch(0.25 0.05 240);
+    --purple: oklch(0.72 0.14 305);
+    --purple-subtle: oklch(0.26 0.05 305);
 
-    --ring: oklch(0.68 0.14 256 / 0.45);
+    --ring: oklch(0.68 0.17 277 / 0.45);
 }
 
 @layer base {
@@ -153,5 +178,17 @@
 
     .scroll-thin::-webkit-scrollbar-track {
         background: transparent;
+    }
+
+    /* Subtle dotted grid used behind the auth / hero surfaces */
+    .bg-grid {
+        background-image:
+            linear-gradient(
+                to right,
+                var(--border) 1px,
+                transparent 1px
+            ),
+            linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+        background-size: 32px 32px;
     }
 }

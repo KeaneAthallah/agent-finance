@@ -450,7 +450,7 @@ export default function DocumentsIndex({
                         <div className="scroll-thin overflow-x-auto">
                             <table className="w-full min-w-[720px] text-sm">
                                 <thead>
-                                    <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                    <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                         <th className="py-2 pr-4 font-medium">
                                             Document
                                         </th>
@@ -478,7 +478,7 @@ export default function DocumentsIndex({
                                     {rows.map((document) => (
                                         <tr
                                             key={document.id}
-                                            className="border-b border-border last:border-0 hover:bg-elevated"
+                                            className="border-b border-border transition-colors last:border-0 hover:bg-elevated"
                                         >
                                             <td className="max-w-[280px] py-2 pr-4">
                                                 <Link
@@ -550,7 +550,7 @@ export default function DocumentsIndex({
                                         href={DocumentController.show.url({
                                             document: document.id,
                                         })}
-                                        className="block h-full rounded-lg border border-border bg-surface p-4 transition-colors hover:border-brand/40 hover:bg-elevated"
+                                        className="block h-full rounded-xl border border-border bg-surface p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md"
                                     >
                                         <div className="flex items-start justify-between gap-2">
                                             <p

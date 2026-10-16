@@ -7,6 +7,7 @@ import SihandalMatchController from '@/actions/App/Http/Controllers/SihandalMatc
 import {
     AlertCircleIcon,
     AiIcon,
+    BuildingIcon,
     CheckCircleIcon,
     ClockIcon,
     DownloadIcon,
@@ -396,8 +397,18 @@ export default function DocumentShow({
                 }
             />
 
-            <div className="mb-5">
+            <div className="mb-5 flex flex-wrap items-center gap-2">
                 <StatusBadge status={document.status} />
+                <Badge variant="neutral">
+                    {document.document_type?.name ?? 'Unclassified'}
+                </Badge>
+                <Badge variant="neutral">
+                    <BuildingIcon size={12} />
+                    {document.opd?.name ?? 'No OPD'}
+                </Badge>
+                <Badge variant="neutral">
+                    TA {document.fiscal_year ?? '—'}
+                </Badge>
             </div>
 
             <div className="grid items-start gap-4 lg:grid-cols-3">
@@ -423,7 +434,7 @@ export default function DocumentShow({
                                         <li
                                             key={page.page_number}
                                             id={`document-page-${page.page_number}`}
-                                            className="rounded-md border border-border bg-elevated p-3"
+                                            className="rounded-lg border border-border bg-elevated p-3"
                                         >
                                             <div className="flex items-center justify-between gap-2">
                                                 <span className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -525,7 +536,7 @@ export default function DocumentShow({
                             ) : findings ? (
                                 <div>
                                     {/* Overall confidence */}
-                                    <div className="mb-5 rounded-md border border-border bg-elevated p-3">
+                                    <div className="mb-5 rounded-lg border border-border bg-elevated p-3">
                                         <div className="flex items-center justify-between gap-3">
                                             <span className="text-xs font-medium text-muted">
                                                 Overall AI confidence
@@ -664,7 +675,7 @@ export default function DocumentShow({
                                     {validation.anomalies.map((anomaly) => (
                                         <li
                                             key={anomaly.id}
-                                            className="rounded-md border border-border p-3"
+                                            className="rounded-lg border border-border p-3"
                                         >
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <span className="text-sm font-medium text-foreground">
@@ -874,7 +885,7 @@ export default function DocumentShow({
                                     {reviews.map((review) => (
                                         <li
                                             key={review.id}
-                                            className="rounded-md border border-border p-2.5 text-sm"
+                                            className="rounded-lg border border-border p-2.5 text-sm"
                                         >
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <Badge
@@ -1021,7 +1032,7 @@ export default function DocumentShow({
                                 {sihandal.matches.map((match) => (
                                     <li
                                         key={match.id}
-                                        className="rounded-md border border-border p-3 text-sm"
+                                        className="rounded-lg border border-border p-3 text-sm"
                                     >
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -1149,7 +1160,7 @@ export default function DocumentShow({
                             <div className="scroll-thin overflow-x-auto">
                                 <table className="w-full min-w-[640px] text-sm">
                                     <thead>
-                                        <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                        <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                             <th className="py-2 pr-4 font-medium">
                                                 Status
                                             </th>
@@ -1174,7 +1185,7 @@ export default function DocumentShow({
                                         {sihandal.syncs.map((sync) => (
                                             <tr
                                                 key={sync.id}
-                                                className="border-b border-border last:border-0"
+                                                className="border-b border-border transition-colors last:border-0 hover:bg-elevated"
                                             >
                                                 <td className="py-2 pr-4">
                                                     <Badge
@@ -1317,7 +1328,7 @@ function FindingGroup({
                 {title}
                 <span className="font-normal text-subtle">— {description}</span>
             </div>
-            <ul className="divide-y divide-border rounded-md border border-border">
+            <ul className="divide-y divide-border rounded-lg border border-border">
                 {fields.map((field) => {
                     const hasEvidence =
                         field.evidence?.page != null ||

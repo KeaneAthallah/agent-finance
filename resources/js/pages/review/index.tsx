@@ -19,6 +19,7 @@ import {
     PaginationLinks,
     StatCard,
 } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { InertiaPageProps } from '@/types';
 
 type DocumentItem = {
@@ -63,6 +64,13 @@ const SEVERITY_RANK: Record<string, number> = {
     high: 1,
     warning: 2,
     info: 3,
+};
+
+const SEVERITY_ACCENT: Record<string, string> = {
+    critical: 'border-l-danger',
+    high: 'border-l-danger',
+    warning: 'border-l-warning',
+    info: 'border-l-info',
 };
 
 function severityRank(severity: string | undefined): number {
@@ -174,7 +182,7 @@ export default function ReviewIndex({
                         <div className="scroll-thin overflow-x-auto">
                             <table className="w-full min-w-[760px] text-sm">
                                 <thead>
-                                    <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                    <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                         <th className="py-2 pr-4 font-medium">
                                             Priority
                                         </th>
@@ -214,9 +222,18 @@ export default function ReviewIndex({
                                         return (
                                             <tr
                                                 key={document.id}
-                                                className="border-b border-border last:border-0 hover:bg-elevated"
+                                                className="border-b border-border transition-colors last:border-0 hover:bg-elevated"
                                             >
-                                                <td className="py-2 pr-4">
+                                                <td
+                                                    className={cn(
+                                                        'border-l-2 py-2 pr-4',
+                                                        severity
+                                                            ? SEVERITY_ACCENT[
+                                                                  severity
+                                                              ]
+                                                            : 'border-l-transparent',
+                                                    )}
+                                                >
                                                     {severity ? (
                                                         <Badge
                                                             variant={

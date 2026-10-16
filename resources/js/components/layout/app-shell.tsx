@@ -238,35 +238,40 @@ export function AppShell({
         <aside
             className={cn(
                 'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-surface transition-[width,transform] duration-200 ease-out lg:static lg:translate-x-0',
-                collapsed ? 'w-16' : 'w-64',
+                collapsed ? 'w-[68px]' : 'w-64',
                 mobileOpen ? 'translate-x-0' : '-translate-x-full',
             )}
         >
             {/* Brand */}
-            <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-border px-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-brand text-xs font-bold text-brand-foreground">
+            <div className="flex h-16 shrink-0 items-center gap-2.5 px-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-purple text-[13px] font-bold text-brand-foreground shadow-sm">
                     AF
                 </span>
-                <span
+                <div
                     className={cn(
-                        'truncate text-sm font-semibold tracking-tight text-foreground transition-opacity',
+                        'min-w-0 flex-1 transition-opacity',
                         collapsed && 'sr-only',
                     )}
                 >
-                    Agent Finance
-                </span>
+                    <p className="truncate text-sm font-semibold tracking-tight text-foreground">
+                        Agent Finance
+                    </p>
+                    <p className="truncate text-[11px] text-subtle">
+                        Document intelligence
+                    </p>
+                </div>
             </div>
 
             {/* Navigation */}
             <nav
                 aria-label="Main"
-                className="scroll-thin flex-1 space-y-5 overflow-y-auto px-2 py-4"
+                className="scroll-thin flex-1 space-y-6 overflow-y-auto px-3 py-4"
             >
                 {visibleNav.map((section) => (
                     <div key={section.section}>
                         <p
                             className={cn(
-                                'px-2 pb-1 text-[11px] font-semibold tracking-wider text-subtle uppercase',
+                                'px-2.5 pb-1.5 text-[10px] font-semibold tracking-[0.12em] text-subtle uppercase',
                                 collapsed && 'sr-only',
                             )}
                         >
@@ -280,13 +285,25 @@ export function AppShell({
                                 const Icon = item.icon;
 
                                 return (
-                                    <li key={item.href}>
+                                    <li key={item.href} className="relative">
+                                        {active ? (
+                                            <span
+                                                aria-hidden
+                                                className={cn(
+                                                    'absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-brand',
+                                                    collapsed && 'hidden',
+                                                )}
+                                            />
+                                        ) : null}
                                         <Link
                                             href={item.href}
                                             onClick={() => setMobileOpen(false)}
                                             title={item.label}
+                                            aria-current={
+                                                active ? 'page' : undefined
+                                            }
                                             className={cn(
-                                                'flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors',
+                                                'group flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
                                                 active
                                                     ? 'bg-brand-subtle font-medium text-brand'
                                                     : 'text-muted hover:bg-elevated hover:text-foreground',
@@ -295,7 +312,7 @@ export function AppShell({
                                             )}
                                         >
                                             <Icon
-                                                size={17}
+                                                size={18}
                                                 className="shrink-0"
                                             />
                                             <span
@@ -307,7 +324,7 @@ export function AppShell({
                                                 {item.label}
                                             </span>
                                             {item.phase && !collapsed ? (
-                                                <span className="rounded bg-elevated px-1.5 py-0.5 text-[10px] font-medium text-subtle">
+                                                <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium text-subtle ring-1 ring-border ring-inset">
                                                     P{item.phase}
                                                 </span>
                                             ) : null}
@@ -320,41 +337,15 @@ export function AppShell({
                 ))}
             </nav>
 
-            {/* Collapse toggle (desktop) */}
-            <div className="hidden shrink-0 border-t border-border p-2 lg:block">
-                <button
-                    type="button"
-                    onClick={toggleCollapsed}
-                    aria-label={
-                        collapsed ? 'Expand sidebar' : 'Collapse sidebar'
-                    }
-                    title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                    className={cn(
-                        'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-muted transition-colors hover:bg-elevated hover:text-foreground',
-                        collapsed && 'justify-center px-0',
-                    )}
-                >
-                    {collapsed ? (
-                        <ChevronRightIcon size={17} />
-                    ) : (
-                        <ChevronLeftIcon size={17} />
-                    )}
-                    <span className={cn('truncate', collapsed && 'sr-only')}>
-                        Collapse
-                    </span>
-                </button>
-            </div>
-
-            {/* User identity (kept in the DOM for screen readers
-                even when the sidebar is collapsed) */}
-            <div className="shrink-0 border-t border-border px-3 py-3">
+            {/* User identity + collapse */}
+            <div className="shrink-0 border-t border-border p-3">
                 <div
                     className={cn(
-                        'flex items-center gap-2.5',
-                        collapsed && 'justify-center',
+                        'flex items-center gap-2.5 rounded-lg bg-elevated p-2',
+                        collapsed && 'justify-center bg-transparent p-0',
                     )}
                 >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-subtle text-xs font-semibold text-brand">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-purple text-xs font-semibold text-brand-foreground">
                         {initials}
                     </span>
                     <div
@@ -370,6 +361,28 @@ export function AppShell({
                         </p>
                     </div>
                 </div>
+
+                <button
+                    type="button"
+                    onClick={toggleCollapsed}
+                    aria-label={
+                        collapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                    }
+                    title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    className={cn(
+                        'mt-2 hidden w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-subtle transition-colors hover:bg-elevated hover:text-foreground lg:flex',
+                        collapsed && 'justify-center px-0',
+                    )}
+                >
+                    {collapsed ? (
+                        <ChevronRightIcon size={16} />
+                    ) : (
+                        <ChevronLeftIcon size={16} />
+                    )}
+                    <span className={cn('truncate', collapsed && 'sr-only')}>
+                        Collapse
+                    </span>
+                </button>
             </div>
         </aside>
     );
@@ -380,7 +393,7 @@ export function AppShell({
 
             {mobileOpen ? (
                 <div
-                    className="fixed inset-0 z-30 bg-foreground/40 lg:hidden"
+                    className="fixed inset-0 z-30 bg-foreground/40 backdrop-blur-sm lg:hidden"
                     onClick={() => setMobileOpen(false)}
                     aria-hidden
                 />
@@ -388,10 +401,10 @@ export function AppShell({
 
             {/* Workspace */}
             <div className="flex min-w-0 flex-1 flex-col">
-                <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface/90 px-3 backdrop-blur lg:px-5">
+                <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface/80 px-3 backdrop-blur-xl lg:px-6">
                     <button
                         type="button"
-                        className="cursor-pointer rounded-md p-1.5 text-muted hover:bg-elevated lg:hidden"
+                        className="cursor-pointer rounded-lg p-1.5 text-muted transition-colors hover:bg-elevated lg:hidden"
                         onClick={() => setMobileOpen((open) => !open)}
                         aria-label="Toggle navigation"
                         aria-expanded={mobileOpen}
@@ -406,7 +419,7 @@ export function AppShell({
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                             {activeSection ? (
-                                <span className="hidden items-center gap-1.5 text-xs text-subtle sm:flex">
+                                <span className="hidden items-center gap-1.5 text-xs font-medium text-subtle sm:flex">
                                     <span className="max-w-40 truncate">
                                         {activeSection}
                                     </span>
@@ -432,7 +445,7 @@ export function AppShell({
                     >
                         <SearchIcon
                             size={15}
-                            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-subtle"
+                            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-subtle"
                         />
                         <input
                             type="search"
@@ -440,7 +453,7 @@ export function AppShell({
                             onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search documents…"
                             aria-label="Search documents"
-                            className="h-9 w-48 rounded-md border border-border bg-elevated pr-3 pl-8 text-sm text-foreground placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none lg:w-64"
+                            className="h-9 w-52 rounded-lg border border-border bg-elevated pr-3 pl-9 text-sm text-foreground transition-colors placeholder:text-subtle hover:border-border-strong focus:border-brand focus:bg-surface focus:ring-2 focus:ring-brand/20 focus:outline-none lg:w-72"
                         />
                     </form>
 
@@ -449,8 +462,9 @@ export function AppShell({
                         <Dropdown
                             label="Notifications"
                             trigger={
-                                <span className="flex h-9 w-9 items-center justify-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-foreground">
+                                <span className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-elevated hover:text-foreground">
                                     <BellGlyph />
+                                    <span className="absolute top-2 right-2.5 h-1.5 w-1.5 rounded-full bg-brand ring-2 ring-surface" />
                                 </span>
                             }
                         >
@@ -477,8 +491,8 @@ export function AppShell({
                         <Dropdown
                             label="Account"
                             trigger={
-                                <span className="flex h-9 items-center gap-2 rounded-md px-1.5 text-muted transition-colors hover:bg-elevated hover:text-foreground">
-                                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-subtle text-[11px] font-semibold text-brand">
+                                <span className="ml-1 flex h-9 items-center gap-2 rounded-lg pl-1 pr-2 text-muted transition-colors hover:bg-elevated hover:text-foreground">
+                                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-purple text-[11px] font-semibold text-brand-foreground">
                                         {initials}
                                     </span>
                                 </span>
@@ -549,7 +563,7 @@ export function AppShell({
                                 method="post"
                                 as="button"
                                 onClick={() => setMobileOpen(false)}
-                                className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-danger transition-colors hover:bg-danger-subtle"
+                                className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-danger transition-colors hover:bg-danger-subtle"
                             >
                                 <LogoutIcon size={15} />
                                 Sign out
@@ -558,7 +572,11 @@ export function AppShell({
                     </div>
                 </header>
 
-                <main className="flex-1 px-3 py-5 lg:px-6">{children}</main>
+                <main className="flex-1 px-3 py-5 lg:px-6 lg:py-6">
+                    <div className="mx-auto w-full max-w-[1500px]">
+                        {children}
+                    </div>
+                </main>
             </div>
         </div>
     );

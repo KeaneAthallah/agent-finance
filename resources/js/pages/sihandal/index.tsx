@@ -208,7 +208,7 @@ export default function SihandalIndex({
                         <div className="scroll-thin overflow-x-auto">
                             <table className="w-full min-w-[780px] text-sm">
                                 <thead>
-                                    <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                    <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                         <th className="py-2 pr-4 font-medium">
                                             Confidence
                                         </th>
@@ -233,7 +233,7 @@ export default function SihandalIndex({
                                     {pendingMatches.data.map((match) => (
                                         <tr
                                             key={match.id}
-                                            className="border-b border-border last:border-0 hover:bg-elevated"
+                                            className="border-b border-border transition-colors last:border-0 hover:bg-elevated"
                                         >
                                             <td className="py-2 pr-4">
                                                 <Badge
@@ -360,7 +360,7 @@ export default function SihandalIndex({
                         <div className="scroll-thin overflow-x-auto">
                             <table className="w-full min-w-[720px] text-sm">
                                 <thead>
-                                    <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                    <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                         <th className="py-2 pr-4 font-medium">
                                             Status
                                         </th>
@@ -386,7 +386,7 @@ export default function SihandalIndex({
                                     {syncs.data.map((sync) => (
                                         <tr
                                             key={sync.id}
-                                            className="border-b border-border last:border-0 hover:bg-elevated"
+                                            className="border-b border-border transition-colors last:border-0 hover:bg-elevated"
                                         >
                                             <td className="py-2 pr-4">
                                                 <Badge

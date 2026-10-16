@@ -236,7 +236,7 @@ export default function AdminIndex({
                 <div className="scroll-thin overflow-x-auto">
                     <table className="w-full min-w-[720px] text-sm">
                         <thead>
-                            <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                            <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                 <th className="py-2 pr-4 font-medium">Name</th>
                                 <th className="py-2 pr-4 font-medium">Role</th>
                                 <th className="py-2 pr-4 font-medium">OPD</th>
@@ -247,7 +247,7 @@ export default function AdminIndex({
                             {users.map((user) => (
                                 <tr
                                     key={user.id}
-                                    className="border-b border-border align-middle last:border-0"
+                                    className="border-b border-border align-middle transition-colors last:border-0 hover:bg-elevated/50"
                                 >
                                     <td className="max-w-[240px] py-2 pr-4">
                                         <span className="block truncate font-medium text-foreground">
@@ -380,7 +380,7 @@ export default function AdminIndex({
                                 {opds.map((opd) => (
                                     <tr
                                         key={opd.id}
-                                        className="border-b border-border last:border-0"
+                                        className="border-b border-border transition-colors last:border-0 hover:bg-elevated/50"
                                     >
                                         <td className="max-w-[60%] py-1.5 pr-4">
                                             <span className="font-medium text-foreground">
@@ -423,7 +423,7 @@ export default function AdminIndex({
 
                     {manage ? (
                         <form
-                            className="mt-4 rounded-md border border-border bg-elevated p-3"
+                            className="mt-4 rounded-lg border border-border bg-elevated p-3"
                             onSubmit={createOpd}
                         >
                             <div className="mb-2 text-sm font-medium text-foreground">
@@ -474,7 +474,7 @@ export default function AdminIndex({
                                     {documentTypes.map((type) => (
                                         <tr
                                             key={type.id}
-                                            className="border-b border-border last:border-0"
+                                            className="border-b border-border transition-colors last:border-0 hover:bg-elevated/50"
                                         >
                                             <td className="max-w-[65%] py-1.5 pr-4">
                                                 <span className="font-medium text-foreground uppercase">
@@ -547,7 +547,7 @@ export default function AdminIndex({
                             <div className="scroll-thin overflow-x-auto">
                                 <table className="w-full min-w-[560px] text-sm">
                                     <thead>
-                                        <tr className="border-b border-border text-left text-xs tracking-wide text-subtle uppercase">
+                                        <tr className="border-b border-border bg-sunken/50 text-left text-[11px] font-medium tracking-wider text-subtle uppercase">
                                             <th className="py-1.5 pr-4 font-medium">
                                                 Version
                                             </th>
@@ -569,7 +569,7 @@ export default function AdminIndex({
                                         {versions.map((version) => (
                                             <tr
                                                 key={version.id}
-                                                className="border-b border-border last:border-0"
+                                                className="border-b border-border transition-colors last:border-0 hover:bg-elevated/50"
                                             >
                                                 <td className="py-1.5 pr-4 font-medium text-foreground">
                                                     {version.version}
@@ -625,7 +625,7 @@ export default function AdminIndex({
 
                 {manage ? (
                     <form
-                        className="rounded-md border border-border bg-elevated p-3"
+                        className="rounded-lg border border-border bg-elevated p-3"
                         onSubmit={createPrompt}
                     >
                         <div className="mb-2 text-sm font-medium text-foreground">

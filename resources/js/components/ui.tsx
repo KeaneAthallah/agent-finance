@@ -48,17 +48,18 @@ export function Button({
     return (
         <button
             className={cn(
-                'inline-flex cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors',
-                'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:outline-none',
+                'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg text-sm font-medium whitespace-nowrap transition-[background-color,box-shadow,color,transform] active:translate-y-px',
+                'focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:outline-none',
                 'disabled:pointer-events-none disabled:opacity-50',
-                size === 'sm' ? 'h-8 px-3' : 'h-10 px-4',
+                size === 'sm' ? 'h-8 px-3 text-xs' : 'h-9 px-4',
                 variant === 'default' &&
-                    'bg-brand text-brand-foreground hover:bg-brand-strong',
+                    'bg-brand text-brand-foreground shadow-sm hover:bg-brand-strong',
                 variant === 'outline' &&
-                    'border border-border-strong bg-surface text-foreground hover:bg-elevated',
+                    'border border-border bg-surface text-foreground shadow-xs hover:border-border-strong hover:bg-elevated',
                 variant === 'ghost' &&
                     'text-muted hover:bg-elevated hover:text-foreground',
-                variant === 'danger' && 'bg-danger text-white hover:opacity-90',
+                variant === 'danger' &&
+                    'bg-danger text-white shadow-sm hover:opacity-90',
                 className,
             )}
             {...props}
@@ -70,7 +71,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     return (
         <div
             className={cn(
-                'rounded-lg border border-border bg-surface shadow-sm',
+                'rounded-xl border border-border bg-surface shadow-sm',
                 className,
             )}
             {...props}
@@ -84,7 +85,7 @@ export function CardHeader({
 }: HTMLAttributes<HTMLDivElement>) {
     return (
         <div
-            className={cn('border-b border-border px-4 py-3', className)}
+            className={cn('border-b border-border px-5 py-4', className)}
             {...props}
         />
     );
@@ -107,7 +108,7 @@ export function CardDescription({
     ...props
 }: HTMLAttributes<HTMLParagraphElement>) {
     return (
-        <p className={cn('mt-0.5 text-xs text-muted', className)} {...props} />
+        <p className={cn('mt-1 text-xs text-muted', className)} {...props} />
     );
 }
 
@@ -115,7 +116,7 @@ export function CardContent({
     className,
     ...props
 }: HTMLAttributes<HTMLDivElement>) {
-    return <div className={cn('px-4 py-3', className)} {...props} />;
+    return <div className={cn('px-5 py-4', className)} {...props} />;
 }
 
 type BadgeVariant = 'neutral' | 'blue' | 'green' | 'amber' | 'red' | 'purple';
@@ -128,7 +129,7 @@ export function Badge({
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
                 variant === 'neutral' &&
                     'border border-border bg-elevated text-muted',
                 variant === 'blue' && 'bg-info-subtle text-info',
@@ -150,8 +151,8 @@ export function Input({
     return (
         <input
             className={cn(
-                'h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-sm text-foreground',
-                'placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none',
+                'h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground shadow-xs transition-colors',
+                'placeholder:text-subtle hover:border-border-strong focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none',
                 className,
             )}
             {...props}
@@ -166,8 +167,8 @@ export function Select({
     return (
         <select
             className={cn(
-                'h-10 w-full cursor-pointer rounded-md border border-border-strong bg-surface px-2 text-sm text-foreground',
-                'focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none',
+                'h-9 w-full cursor-pointer rounded-lg border border-border bg-surface px-2.5 text-sm text-foreground shadow-xs transition-colors',
+                'hover:border-border-strong focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none',
                 className,
             )}
             {...props}
@@ -182,8 +183,8 @@ export function Textarea({
     return (
         <textarea
             className={cn(
-                'w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-foreground',
-                'placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none',
+                'w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground shadow-xs transition-colors',
+                'placeholder:text-subtle hover:border-border-strong focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none',
                 className,
             )}
             {...props}
@@ -198,7 +199,7 @@ export function Label({
     return (
         <label
             className={cn(
-                'mb-1 block text-sm font-medium text-muted',
+                'mb-1.5 block text-xs font-medium text-muted',
                 className,
             )}
             {...props}
@@ -218,15 +219,15 @@ export function EmptyState({
     icon?: ReactNode;
 }) {
     return (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-strong bg-elevated px-6 py-16 text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface text-subtle">
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-sunken px-6 py-16 text-center">
+            <div className="mb-1 flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-surface text-subtle shadow-xs">
                 {icon ?? <InboxGlyph />}
             </div>
             <p className="text-sm font-semibold text-foreground">{title}</p>
             {description ? (
                 <p className="max-w-md text-sm text-muted">{description}</p>
             ) : null}
-            {action}
+            {action ? <div className="mt-2">{action}</div> : null}
         </div>
     );
 }
@@ -338,13 +339,18 @@ export function StatCard({
     className?: string;
 }) {
     return (
-        <Card className={cn('p-4', className)}>
+        <Card
+            className={cn(
+                'p-4 transition-shadow hover:shadow-md',
+                className,
+            )}
+        >
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium text-muted">{label}</p>
                 {icon ? (
                     <span
                         className={cn(
-                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
                             variant === 'green' &&
                                 'bg-success-subtle text-success',
                             variant === 'amber' &&
@@ -360,10 +366,10 @@ export function StatCard({
                     </span>
                 ) : null}
             </div>
-            <p className="mt-1.5 text-2xl font-semibold text-foreground tabular-nums">
+            <p className="mt-2 text-[1.75rem] leading-none font-semibold tracking-tight text-foreground tabular-nums">
                 {value}
             </p>
-            {hint ? <p className="mt-0.5 text-xs text-subtle">{hint}</p> : null}
+            {hint ? <p className="mt-1.5 text-xs text-subtle">{hint}</p> : null}
         </Card>
     );
 }
@@ -493,7 +499,7 @@ export function Tabs({
         <div
             role="tablist"
             className={cn(
-                'inline-flex items-center gap-1 rounded-md border border-border bg-elevated p-1',
+                'inline-flex items-center gap-1 rounded-lg border border-border bg-sunken p-1',
                 className,
             )}
         >
@@ -505,7 +511,7 @@ export function Tabs({
                     aria-selected={option.value === value}
                     onClick={() => onChange(option.value)}
                     className={cn(
-                        'cursor-pointer rounded px-2.5 py-1.5 text-xs font-medium transition-colors',
+                        'cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
                         option.value === value
                             ? 'bg-surface text-foreground shadow-sm'
                             : 'text-muted hover:text-foreground',
@@ -529,7 +535,7 @@ export function ViewSwitcher({
         <div
             role="group"
             aria-label="View"
-            className="inline-flex items-center gap-1 rounded-md border border-border bg-elevated p-1"
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-sunken p-1"
         >
             <button
                 type="button"
@@ -537,7 +543,7 @@ export function ViewSwitcher({
                 aria-pressed={view === 'table'}
                 onClick={() => onChange('table')}
                 className={cn(
-                    'flex cursor-pointer items-center rounded p-1.5 transition-colors',
+                    'flex cursor-pointer items-center rounded-md p-1.5 transition-colors',
                     view === 'table'
                         ? 'bg-surface text-foreground shadow-sm'
                         : 'text-muted hover:text-foreground',
@@ -551,7 +557,7 @@ export function ViewSwitcher({
                 aria-pressed={view === 'cards'}
                 onClick={() => onChange('cards')}
                 className={cn(
-                    'flex cursor-pointer items-center rounded p-1.5 transition-colors',
+                    'flex cursor-pointer items-center rounded-md p-1.5 transition-colors',
                     view === 'cards'
                         ? 'bg-surface text-foreground shadow-sm'
                         : 'text-muted hover:text-foreground',
@@ -586,11 +592,11 @@ export function PageHeader({
             )}
         >
             <div className="min-w-0">
-                <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                     {title}
                 </h1>
                 {description ? (
-                    <p className="mt-1 max-w-3xl text-sm text-muted">
+                    <p className="mt-1.5 max-w-3xl text-sm text-muted">
                         {description}
                     </p>
                 ) : null}
@@ -752,7 +758,7 @@ export function Dropdown({
                 <div
                     role="menu"
                     className={cn(
-                        'absolute z-40 mt-2 w-56 rounded-lg border border-border bg-surface p-1.5 shadow-lg',
+                        'absolute z-40 mt-2 w-56 rounded-xl border border-border bg-surface p-1.5 shadow-lg',
                         align === 'right' ? 'right-0' : 'left-0',
                     )}
                 >
@@ -808,7 +814,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
             role="group"
             aria-label="Theme"
             className={cn(
-                'inline-flex items-center gap-1 rounded-md border border-border bg-elevated p-1',
+                'inline-flex items-center gap-1 rounded-lg border border-border bg-sunken p-1',
                 className,
             )}
         >
@@ -827,7 +833,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
                     title={option.label}
                     onClick={() => setPreference(option.value)}
                     className={cn(
-                        'flex cursor-pointer items-center rounded p-1.5 transition-colors',
+                        'flex cursor-pointer items-center rounded-md p-1.5 transition-colors',
                         preference === option.value
                             ? 'bg-surface text-foreground shadow-sm'
                             : 'text-muted hover:text-foreground',

@@ -61,7 +61,7 @@ function Panel({
         <Card>
             <CardHeader>
                 <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-md bg-elevated text-muted">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-elevated text-muted">
                         {icon}
                     </span>
                     <div>
